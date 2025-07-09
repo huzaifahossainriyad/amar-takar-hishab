@@ -96,9 +96,6 @@ const transactionModal = document.getElementById('transaction-modal');
 const transactionForm = document.getElementById('transaction-form');
 // ... পরের কোড ...
 
-// সকল মডাল এবং ফর্ম
-const transactionModal = document.getElementById('transaction-modal');
-const transactionForm = document.getElementById('transaction-form');
 const accountModal = document.getElementById('account-modal');
 const accountForm = document.getElementById('account-form');
 const assetModal = document.getElementById('asset-modal');
