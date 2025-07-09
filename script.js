@@ -85,17 +85,12 @@ const addRecurringBtn = document.getElementById('add-recurring-btn');
 const backupDataBtn = document.getElementById('backup-data-btn');
 const restoreDataBtn = document.getElementById('restore-data-btn');
 const finalDeleteAccountBtn = document.getElementById('final-delete-account-btn');
+const securityPinBtn = document.getElementById('security-pin-btn');
+const twoFactorBtn = document.getElementById('two-factor-btn');
 
-const securityPinBtn = document.getElementById('security-pin-btn'); // <<-- নতুন কোড
-const twoFactorBtn = document.getElementById('two-factor-btn');     // <<-- নতুন কোড
-
-//
 // সকল মডাল এবং ফর্ম
-//
 const transactionModal = document.getElementById('transaction-modal');
 const transactionForm = document.getElementById('transaction-form');
-// ... পরের কোড ...
-
 const accountModal = document.getElementById('account-modal');
 const accountForm = document.getElementById('account-form');
 const assetModal = document.getElementById('asset-modal');
@@ -155,38 +150,6 @@ function showConfirm(message) {
         };
     });
 }
-
-// ==================================================
-// থিম, ট্যাব এবং প্রোফাইল ড্রপডাউন ম্যানেজমেন্ট
-// ==================================================
-function applyTheme(theme) {
-    htmlEl.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-    themeToggle.checked = theme === 'light';
-}
-
-tabs.addEventListener('click', (e) => {
-    const target = e.target.closest('.tab-link');
-    if (!target) return;
-
-    document.querySelectorAll('.tab-link').forEach(tab => tab.classList.remove('active'));
-    target.classList.add('active');
-
-    tabContents.forEach(content => content.classList.remove('active'));
-    document.getElementById(target.dataset.tab).classList.add('active');
-});
-
-profileBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    profileDropdownContainer.classList.toggle('active');
-});
-
-document.addEventListener('click', (e) => {
-    if (!profileDropdownContainer.contains(e.target)) {
-        profileDropdownContainer.classList.remove('active');
-    }
-});
-
 
 // ==================================================
 // ডেটা রেন্ডারিং ফাংশন (UI Update)
@@ -931,249 +894,6 @@ async function handleFormSubmit(e, modal, tableName, idField, dataExtractor) {
     }
 }
 
-// লেনদেন ফর্ম
-transactionForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('transaction-id').value;
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
-
-    try {
-        const receiptFile = document.getElementById('tr-receipt').files[0];
-        let receiptUrl = id ? allTransactions.find(t => t.id == id).receipt_url : null;
-        if (receiptFile) {
-            const filePath = `public/${currentUser.id}/${Date.now()}-${receiptFile.name}`;
-            const { error: uploadError } = await supabase.storage.from('receipts').upload(filePath, receiptFile);
-            if (uploadError) throw uploadError;
-            receiptUrl = supabase.storage.from('receipts').getPublicUrl(filePath).data.publicUrl;
-        }
-
-        const transactionData = {
-            transaction_date: document.getElementById('tr-date').value,
-            description: document.getElementById('tr-description').value,
-            amount: parseFloat(document.getElementById('tr-amount').value),
-            type: document.getElementById('tr-type').value,
-            category_id: parseInt(document.getElementById('tr-category').value),
-            account_id: parseInt(document.getElementById('tr-account').value),
-            receipt_url: receiptUrl,
-            user_id: currentUser.id
-        };
-
-        const { data: savedTransaction, error } = id
-            ? await supabase.from('Transactions').update(transactionData).eq('id', id).select().single()
-            : await supabase.from('Transactions').insert([transactionData]).select().single();
-        if (error) throw error;
-        
-        const tagNames = document.getElementById('tr-tags').value.split(',').map(t => t.trim()).filter(Boolean);
-        if (tagNames.length > 0) {
-            const { data: existingTags, error: tagError } = await supabase.from('Tags').select('id, name').in('name', tagNames);
-            if (tagError) throw tagError;
-
-            const existingTagNames = existingTags.map(t => t.name);
-            const newTagNames = tagNames.filter(t => !existingTagNames.includes(t));
-            
-            let newTags = [];
-            if (newTagNames.length > 0) {
-                const newTagObjects = newTagNames.map(name => ({ name, user_id: currentUser.id }));
-                const { data: insertedTags, error: insertError } = await supabase.from('Tags').insert(newTagObjects).select();
-                if (insertError) throw insertError;
-                newTags = insertedTags;
-            }
-            
-            const allTagIds = [...existingTags, ...newTags].map(t => t.id);
-
-            await supabase.from('Transaction_Tags').delete().eq('transaction_id', savedTransaction.id);
-            const transactionTagObjects = allTagIds.map(tag_id => ({
-                transaction_id: savedTransaction.id,
-                tag_id: tag_id,
-                user_id: currentUser.id
-            }));
-            const { error: linkError } = await supabase.from('Transaction_Tags').insert(transactionTagObjects);
-            if (linkError) throw linkError;
-        } else {
-             await supabase.from('Transaction_Tags').delete().eq('transaction_id', savedTransaction.id);
-        }
-
-        const amount = transactionData.amount;
-        const type = transactionData.type;
-        const accountId = transactionData.account_id;
-        const originalTransaction = id ? allTransactions.find(t => t.id == id) : null;
-        let amountChange = type === 'expense' ? -amount : amount;
-        
-        if(originalTransaction) {
-            const originalAmount = originalTransaction.type === 'expense' ? -originalTransaction.amount : originalTransaction.amount;
-            amountChange -= originalAmount;
-        }
-
-        const { data: account } = await supabase.from('Accounts').select('balance').eq('id', accountId).single();
-        await supabase.from('Accounts').update({ balance: account.balance + amountChange }).eq('id', accountId);
-
-        showToast(`হিসাব সফলভাবে ${id ? 'আপডেট' : 'যোগ'} হয়েছে।`);
-        transactionModal.close();
-        await loadAllDataAndRender();
-
-    } catch (error) {
-        console.error('Error saving transaction:', error.message);
-        showToast('হিসাব সেভ করতে সমস্যা হয়েছে।', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = id ? 'আপডেট করুন' : 'যোগ করুন';
-    }
-});
-
-// অন্যান্য ফর্ম সাবমিশন
-accountForm.addEventListener('submit', (e) => handleFormSubmit(e, accountModal, 'Accounts', '#account-id', () => ({
-    name: document.getElementById('acc-name').value,
-    type: document.getElementById('acc-type').value,
-    balance: parseFloat(document.getElementById('acc-balance').value)
-})));
-
-assetForm.addEventListener('submit', (e) => handleFormSubmit(e, assetModal, 'Assets', '#asset-id', () => ({
-    asset_name: document.getElementById('asset-name').value,
-    asset_type: document.getElementById('asset-type').value,
-    purchase_price: parseFloat(document.getElementById('asset-purchase-price').value) || 0,
-    current_value: parseFloat(document.getElementById('asset-current-value').value) || 0,
-    purchase_date: document.getElementById('asset-purchase-date').value || null,
-    notes: document.getElementById('asset-notes').value
-})));
-
-debtForm.addEventListener('submit', (e) => handleFormSubmit(e, debtModal, 'Debts', '#debt-id', () => ({
-    person_name: document.getElementById('debt-person').value,
-    amount: parseFloat(document.getElementById('debt-amount').value),
-    type: document.getElementById('debt-type').value,
-    status: document.getElementById('debt-status').value,
-    due_date: document.getElementById('debt-due-date').value || null,
-    description: document.getElementById('debt-description').value,
-    is_reminder_enabled: document.getElementById('debt-reminder-enabled').checked,
-    reminder_days: document.getElementById('debt-reminder-enabled').checked ? parseInt(document.getElementById('debt-reminder-days').value) : null
-})));
-
-categoryForm.addEventListener('submit', (e) => handleFormSubmit(e, categoryModal, 'Categories', '#category-id', () => ({
-    name: document.getElementById('cat-name').value,
-    type: document.getElementById('cat-type').value
-})));
-
-tagForm.addEventListener('submit', (e) => handleFormSubmit(e, tagModal, 'Tags', '#tag-id', () => ({
-    name: document.getElementById('tag-name').value
-})));
-
-budgetForm.addEventListener('submit', (e) => handleFormSubmit(e, budgetModal, 'Budgets', '#budget-id', () => ({
-    category_id: parseInt(document.getElementById('budget-category').value),
-    amount: parseFloat(document.getElementById('budget-amount').value),
-    month: `${document.getElementById('budget-month').value}-01`
-})));
-
-goalForm.addEventListener('submit', (e) => handleFormSubmit(e, goalModal, 'Savings_Goals', '#goal-id', () => ({
-    goal_name: document.getElementById('goal-name').value,
-    target_amount: parseFloat(document.getElementById('goal-target-amount').value),
-    current_amount: parseFloat(document.getElementById('goal-current-amount').value),
-    target_date: document.getElementById('goal-target-date').value || null
-})));
-
-recurringForm.addEventListener('submit', (e) => handleFormSubmit(e, recurringModal, 'Recurring_Transactions', '#recurring-id', () => ({
-    description: document.getElementById('rec-description').value,
-    amount: parseFloat(document.getElementById('rec-amount').value),
-    type: document.getElementById('rec-type').value,
-    account_id: parseInt(document.getElementById('rec-account').value),
-    category_id: parseInt(document.getElementById('rec-category').value),
-    recurrence_rule: document.getElementById('rec-rule').value,
-    start_date: document.getElementById('rec-start-date').value,
-    next_due_date: document.getElementById('rec-start-date').value,
-    is_reminder_enabled: document.getElementById('rec-reminder-enabled').checked,
-    reminder_days: document.getElementById('rec-reminder-enabled').checked ? parseInt(document.getElementById('rec-reminder-days').value) : null
-})));
-
-transferForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
-    try {
-        const fromId = parseInt(document.getElementById('transfer-from').value);
-        const toId = parseInt(document.getElementById('transfer-to').value);
-        const amount = parseFloat(document.getElementById('transfer-amount').value);
-        if (fromId === toId) throw new Error("একই অ্যাকাউন্টে টাকা ট্রান্সফার করা যাবে না।");
-
-        const { data: fromAcc } = await supabase.from('Accounts').select('balance').eq('id', fromId).single();
-        const { data: toAcc } = await supabase.from('Accounts').select('balance').eq('id', toId).single();
-
-        await supabase.from('Accounts').update({ balance: fromAcc.balance - amount }).eq('id', fromId);
-        await supabase.from('Accounts').update({ balance: toAcc.balance + amount }).eq('id', toId);
-
-        await supabase.from('Transfers').insert([{
-            from_account_id: fromId,
-            to_account_id: toId,
-            amount: amount,
-            transfer_date: document.getElementById('transfer-date').value,
-            description: document.getElementById('transfer-description').value,
-            user_id: currentUser.id
-        }]);
-
-        showToast('টাকা সফলভাবে ট্রান্সফার হয়েছে।');
-        transferModal.close();
-        await loadAllDataAndRender();
-    } catch (error) {
-        console.error('Error transferring money:', error.message);
-        showToast(error.message, 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'ট্রান্সফার করুন';
-    }
-});
-
-// ==================================================
-// ডিলিট এবং এডিট হ্যান্ডলার
-// ==================================================
-document.body.addEventListener('click', async (e) => {
-    const target = e.target.closest('.action-btn.delete-btn');
-    if (!target) return;
-
-    const id = parseInt(target.dataset.id) || target.dataset.id;
-    const type = target.dataset.type;
-    const confirmed = await showConfirm('আপনি কি নিশ্চিতভাবে এটি মুছতে চান? এই কাজটি ফেরানো যাবে না।');
-    if (confirmed) {
-        let tableName;
-        switch(type) {
-            case 'transaction': tableName = 'Transactions'; break;
-            case 'category': tableName = 'Categories'; break;
-            case 'budget': tableName = 'Budgets'; break;
-            case 'goal': tableName = 'Savings_Goals'; break;
-            case 'debt': tableName = 'Debts'; break;
-            case 'account': tableName = 'Accounts'; break;
-            case 'tag': tableName = 'Tags'; break;
-            case 'recurring': tableName = 'Recurring_Transactions'; break;
-            case 'asset': tableName = 'Assets'; break;
-        }
-        try {
-            if (type === 'transaction') {
-                const t = allTransactions.find(tr => tr.id == id);
-                if(t) {
-                    const amountChange = t.type === 'expense' ? t.amount : -t.amount;
-                    const { data: account } = await supabase.from('Accounts').select('balance').eq('id', t.account_id).single();
-                    await supabase.from('Accounts').update({ balance: account.balance + amountChange }).eq('id', t.account_id);
-                    await supabase.from('Transaction_Tags').delete().eq('transaction_id', id);
-                }
-            }
-            const { error } = await supabase.from(tableName).delete().eq('id', id);
-            if (error) throw error;
-            showToast('সফলভাবে মুছে ফেলা হয়েছে।');
-            await loadAllDataAndRender();
-        } catch (error) {
-            console.error(`Error deleting ${type}:`, error.message);
-            showToast('মুছতে সমস্যা হয়েছে। সম্পর্কিত ডেটা থাকতে পারে।', 'error');
-        }
-    }
-});
-
-document.body.addEventListener('click', (e) => {
-    const target = e.target.closest('.action-btn.edit-btn');
-    if (!target) return;
-    const id = parseInt(target.dataset.id) || target.dataset.id;
-    const type = target.dataset.type;
-    openModal(type, id);
-});
-
 // ==================================================
 // বিশেষ ফিচার (CSV, Backup, Reminder, Account Deletion)
 // ==================================================
@@ -1190,23 +910,6 @@ function exportToCsv(filename, rows) {
     link.click();
     document.body.removeChild(link);
 }
-
-exportBtn.addEventListener('click', () => {
-    if (allTransactions.length === 0) {
-        showToast("এক্সপোর্ট করার মতো কোনো ডেটা নেই।", "error");
-        return;
-    }
-    const dataToExport = allTransactions.map(t => ({
-        'তারিখ': formatDate(t.transaction_date),
-        'বিবরণ': t.description,
-        'ধরন': t.type === 'income' ? 'আয়' : 'ব্যয়',
-        'পরিমাণ': t.amount,
-        'ক্যাটাগরি': t.Categories?.name || '',
-        'অ্যাকাউন্ট': t.Accounts?.name || '',
-        'ট্যাগ': t.Tags.map(tag => tag.name).join(' | ')
-    }));
-    exportToCsv('transactions.csv', dataToExport);
-});
 
 function checkReminders() {
     const today = new Date();
@@ -1295,107 +998,15 @@ async function handleDeleteAccount() {
 }
 
 // ==================================================
-// সেটিংস এবং ডেটা ম্যানেজমেন্ট
-// ==================================================
-backupDataBtn.addEventListener('click', async () => {
-    const confirmed = await showConfirm("আপনি কি সকল ডেটার ব্যাকআপ নিতে চান? এটি একটি JSON ফাইল ডাউনলোড করবে।");
-    if (!confirmed) return;
-
-    showToast("ব্যাকআপ প্রস্তুত করা হচ্ছে...", "info");
-    const dataToBackup = {
-        Accounts: allAccounts,
-        Assets: allAssets,
-        Budgets: allBudgets,
-        Categories: allCategories,
-        Debts: allDebts,
-        Recurring_Transactions: allRecurring,
-        Savings_Goals: allGoals,
-        Tags: allTags,
-        Transactions: allTransactions.map(t => ({...t, Tags: undefined, Accounts: undefined, Categories: undefined})),
-        Transaction_Tags: allTransactionTags,
-        Transfers: allTransfers
-    };
-    
-    const jsonString = JSON.stringify(dataToBackup, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const date = new Date().toISOString().slice(0, 10);
-    link.download = `amar-hishab-backup-${date}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast("ব্যাকআপ সফলভাবে ডাউনলোড হয়েছে।");
-});
-
-restoreDataBtn.addEventListener('click', () => {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json';
-    fileInput.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const backupData = JSON.parse(event.target.result);
-                const confirmed = await showConfirm("আপনি কি নিশ্চিতভাবে ডেটা রিস্টোর করতে চান? এটি আপনার বর্তমান সকল ডেটা মুছে ফেলবে এবং ব্যাকআপ থেকে নতুন ডেটা যোগ করবে। এই কাজটি ফেরানো যাবে না।");
-                if (!confirmed) return;
-
-                showToast("ডেটা রিস্টোর করা হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।", "info");
-
-                // Delete existing data
-                await supabase.from('Transaction_Tags').delete().eq('user_id', currentUser.id);
-                await supabase.from('Transfers').delete().eq('user_id', currentUser.id);
-                await supabase.from('Transactions').delete().eq('user_id', currentUser.id);
-                await supabase.from('Recurring_Transactions').delete().eq('user_id', currentUser.id);
-                await supabase.from('Budgets').delete().eq('user_id', currentUser.id);
-                await supabase.from('Savings_Goals').delete().eq('user_id', currentUser.id);
-                await supabase.from('Debts').delete().eq('user_id', currentUser.id);
-                await supabase.from('Assets').delete().eq('user_id', currentUser.id);
-                await supabase.from('Accounts').delete().eq('user_id', currentUser.id);
-                await supabase.from('Categories').delete().eq('user_id', currentUser.id);
-                await supabase.from('Tags').delete().eq('user_id', currentUser.id);
-
-                // Insert new data with current user's ID
-                const stampWithUser = (data) => data.map(item => ({...item, user_id: currentUser.id, id: undefined}));
-                
-                await supabase.from('Tags').insert(stampWithUser(backupData.Tags || []));
-                await supabase.from('Categories').insert(stampWithUser(backupData.Categories || []));
-                await supabase.from('Accounts').insert(stampWithUser(backupData.Accounts || []));
-                await supabase.from('Assets').insert(stampWithUser(backupData.Assets || []));
-                await supabase.from('Debts').insert(stampWithUser(backupData.Debts || []));
-                await supabase.from('Savings_Goals').insert(stampWithUser(backupData.Savings_Goals || []));
-                await supabase.from('Budgets').insert(stampWithUser(backupData.Budgets || []));
-                await supabase.from('Recurring_Transactions').insert(stampWithUser(backupData.Recurring_Transactions || []));
-                await supabase.from('Transactions').insert(stampWithUser(backupData.Transactions || []));
-                await supabase.from('Transfers').insert(stampWithUser(backupData.Transfers || []));
-                // Transaction_Tags need special handling if IDs change. A more robust restore would map old IDs to new IDs.
-                // For now, this simple restore might fail on foreign keys.
-
-                showToast("ডেটা সফলভাবে রিস্টোর হয়েছে।", "success");
-                await loadAllDataAndRender();
-
-            } catch (error) {
-                console.error("Restore error:", error);
-                showToast("রিস্টোর করতে সমস্যা হয়েছে। ফাইলটি সঠিক ফরম্যাটে আছে কিনা দেখুন।", "error");
-            }
-        };
-        reader.readAsText(file);
-    };
-    fileInput.click();
-});
-
-// ==================================================
 // ইভেন্ট লিসেনার (Event Listeners)
 // ==================================================
 document.addEventListener('DOMContentLoaded', async () => {
+    // থিম সেট করা
     const savedTheme = localStorage.getItem('theme') || 'dark';
-    applyTheme(savedTheme);
+    htmlEl.setAttribute('data-theme', savedTheme);
+    themeToggle.checked = savedTheme === 'light';
     
+    // সেশন চেক এবং ডেটা লোড
     const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error || !session) {
@@ -1406,78 +1017,441 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUser = session.user;
     userEmailDisplay.textContent = currentUser.email;
     loadAllDataAndRender();
-});
 
-themeToggle.addEventListener('change', () => applyTheme(themeToggle.checked ? 'light' : 'dark'));
+    // ==================================================
+    // সকল ইভেন্ট লিসেনার এখানে যুক্ত করা হলো
+    // ==================================================
 
-logoutBtn.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    window.location.href = 'login.html';
-});
+    // থিম পরিবর্তন
+    themeToggle.addEventListener('change', () => {
+        const newTheme = themeToggle.checked ? 'light' : 'dark';
+        htmlEl.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+    });
 
-// ...আগের কোড...
+    // ট্যাব পরিবর্তন
+    tabs.addEventListener('click', (e) => {
+        const target = e.target.closest('.tab-link');
+        if (!target) return;
 
-loginHistoryBtn.addEventListener('click', openLoginHistoryModal);
-deleteAccountBtn.addEventListener('click', handleDeleteAccount);
-finalDeleteAccountBtn.addEventListener('click', handleDeleteAccount);
+        document.querySelectorAll('.tab-link').forEach(tab => tab.classList.remove('active'));
+        target.classList.add('active');
 
-// =========================================================
-// অনুগ্রহ করে শুধু নিচের অংশটুকু এখানে যোগ করুন
-// =========================================================
-securityPinBtn.addEventListener('click', () => {
-    showToast('অ্যাপ পিন সেট করার ফিচারটি শীঘ্রই আসছে।', 'info');
-});
+        tabContents.forEach(content => content.classList.remove('active'));
+        document.getElementById(target.dataset.tab).classList.add('active');
+    });
 
-twoFactorBtn.addEventListener('click', () => {
-    showToast('2FA সেট করার ফিচারটি শীঘ্রই আসছে।', 'info');
-});
-// =========================================================
+    // প্রোফাইল ড্রপডাউন
+    profileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        profileDropdownContainer.classList.toggle('active');
+    });
 
+    document.addEventListener('click', (e) => {
+        if (!profileDropdownContainer.contains(e.target)) {
+            profileDropdownContainer.classList.remove('active');
+        }
+    });
+    
+    logoutBtn.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        window.location.href = 'login.html';
+    });
+    
+    // ফিল্টার ইভেন্ট
+    [searchInput, typeFilter, startDateFilter, endDateFilter].forEach(el => {
+        el.addEventListener('input', renderTransactions);
+        el.addEventListener('change', renderTransactions);
+    });
 
-// ফিল্টার ইভেন্ট (এই অংশটিও আগে থেকে আছে)
-[searchInput, typeFilter, startDateFilter, endDateFilter].forEach(el => {
-    el.addEventListener('input', renderTransactions);
-//... পরের কোড...
+    // সকল ফর্ম সাবমিশন
+    transactionForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('transaction-id').value;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
 
+        try {
+            const receiptFile = document.getElementById('tr-receipt').files[0];
+            let receiptUrl = id ? allTransactions.find(t => t.id == id).receipt_url : null;
+            if (receiptFile) {
+                const filePath = `public/${currentUser.id}/${Date.now()}-${receiptFile.name}`;
+                const { error: uploadError } = await supabase.storage.from('receipts').upload(filePath, receiptFile);
+                if (uploadError) throw uploadError;
+                receiptUrl = supabase.storage.from('receipts').getPublicUrl(filePath).data.publicUrl;
+            }
 
-// ফিল্টার ইভেন্ট
-[searchInput, typeFilter, startDateFilter, endDateFilter].forEach(el => {
-    el.addEventListener('input', renderTransactions);
-    el.addEventListener('change', renderTransactions);
-});
+            const transactionData = {
+                transaction_date: document.getElementById('tr-date').value,
+                description: document.getElementById('tr-description').value,
+                amount: parseFloat(document.getElementById('tr-amount').value),
+                type: document.getElementById('tr-type').value,
+                category_id: parseInt(document.getElementById('tr-category').value),
+                account_id: parseInt(document.getElementById('tr-account').value),
+                receipt_url: receiptUrl,
+                user_id: currentUser.id
+            };
 
-// মডাল খোলার বাটন
-addTransactionFab.addEventListener('click', () => openModal('transaction'));
-addAccountBtn.addEventListener('click', () => openModal('account'));
-addAssetBtn.addEventListener('click', () => openModal('asset'));
-addTransferBtn.addEventListener('click', () => openModal('transfer'));
-addDebtBtn.addEventListener('click', () => openModal('debt'));
-addCategoryBtn.addEventListener('click', () => openModal('category'));
-addTagBtn.addEventListener('click', () => openModal('tag'));
-addBudgetBtn.addEventListener('click', () => openModal('budget'));
-addGoalBtn.addEventListener('click', () => openModal('goal'));
-addRecurringBtn.addEventListener('click', () => openModal('recurring'));
+            const { data: savedTransaction, error } = id
+                ? await supabase.from('Transactions').update(transactionData).eq('id', id).select().single()
+                : await supabase.from('Transactions').insert([transactionData]).select().single();
+            if (error) throw error;
+            
+            const tagNames = document.getElementById('tr-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+            if (tagNames.length > 0) {
+                const { data: existingTags, error: tagError } = await supabase.from('Tags').select('id, name').in('name', tagNames);
+                if (tagError) throw tagError;
 
-// মডাল বন্ধ করার বাটন
-document.querySelectorAll('[data-close-modal]').forEach(btn => {
-    btn.addEventListener('click', () => btn.closest('dialog').close());
-});
+                const existingTagNames = existingTags.map(t => t.name);
+                const newTagNames = tagNames.filter(t => !existingTagNames.includes(t));
+                
+                let newTags = [];
+                if (newTagNames.length > 0) {
+                    const newTagObjects = newTagNames.map(name => ({ name, user_id: currentUser.id }));
+                    const { data: insertedTags, error: insertError } = await supabase.from('Tags').insert(newTagObjects).select();
+                    if (insertError) throw insertError;
+                    newTags = insertedTags;
+                }
+                
+                const allTagIds = [...existingTags, ...newTags].map(t => t.id);
 
-// লেনদেন মডালে ক্যাটাগরি পরিবর্তনের ইভেন্ট
-document.getElementById('tr-type').addEventListener('change', (e) => {
-    populateSelect(document.getElementById('tr-category'), allCategories.filter(c => c.type === e.target.value), 'id', 'name', 'ক্যাটাগরি নির্বাচন করুন');
-});
-document.getElementById('rec-type').addEventListener('change', (e) => {
-    populateSelect(document.getElementById('rec-category'), allCategories.filter(c => c.type === e.target.value), 'id', 'name', 'ক্যাটাগরি নির্বাচন করুন');
-});
+                await supabase.from('Transaction_Tags').delete().eq('transaction_id', savedTransaction.id);
+                const transactionTagObjects = allTagIds.map(tag_id => ({
+                    transaction_id: savedTransaction.id,
+                    tag_id: tag_id,
+                    user_id: currentUser.id
+                }));
+                const { error: linkError } = await supabase.from('Transaction_Tags').insert(transactionTagObjects);
+                if (linkError) throw linkError;
+            } else {
+                 await supabase.from('Transaction_Tags').delete().eq('transaction_id', savedTransaction.id);
+            }
 
-// রিমাইন্ডার ইনপুট ফিল্ড দেখানো/লুকানো
-document.getElementById('debt-reminder-enabled').addEventListener('change', (e) => {
-    document.getElementById('debt-reminder-days').style.display = e.target.checked ? 'block' : 'none';
-});
-//...
-document.getElementById('rec-reminder-enabled').addEventListener('change', (e) => {
-    document.getElementById('rec-reminder-days').style.display = e.target.checked ? 'block' : 'none';
-});
+            const amount = transactionData.amount;
+            const type = transactionData.type;
+            const accountId = transactionData.account_id;
+            const originalTransaction = id ? allTransactions.find(t => t.id == id) : null;
+            let amountChange = type === 'expense' ? -amount : amount;
+            
+            if(originalTransaction) {
+                const originalAmount = originalTransaction.type === 'expense' ? -originalTransaction.amount : originalTransaction.amount;
+                amountChange -= originalAmount;
+            }
 
-}); // <-- এই লাইনটি যোগ করুন
+            const { data: account } = await supabase.from('Accounts').select('balance').eq('id', accountId).single();
+            await supabase.from('Accounts').update({ balance: account.balance + amountChange }).eq('id', accountId);
+
+            showToast(`হিসাব সফলভাবে ${id ? 'আপডেট' : 'যোগ'} হয়েছে।`);
+            transactionModal.close();
+            await loadAllDataAndRender();
+
+        } catch (error) {
+            console.error('Error saving transaction:', error.message);
+            showToast('হিসাব সেভ করতে সমস্যা হয়েছে।', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = id ? 'আপডেট করুন' : 'যোগ করুন';
+        }
+    });
+    
+    accountForm.addEventListener('submit', (e) => handleFormSubmit(e, accountModal, 'Accounts', '#account-id', () => ({
+        name: document.getElementById('acc-name').value,
+        type: document.getElementById('acc-type').value,
+        balance: parseFloat(document.getElementById('acc-balance').value)
+    })));
+    
+    assetForm.addEventListener('submit', (e) => handleFormSubmit(e, assetModal, 'Assets', '#asset-id', () => ({
+        asset_name: document.getElementById('asset-name').value,
+        asset_type: document.getElementById('asset-type').value,
+        purchase_price: parseFloat(document.getElementById('asset-purchase-price').value) || 0,
+        current_value: parseFloat(document.getElementById('asset-current-value').value) || 0,
+        purchase_date: document.getElementById('asset-purchase-date').value || null,
+        notes: document.getElementById('asset-notes').value
+    })));
+    
+    debtForm.addEventListener('submit', (e) => handleFormSubmit(e, debtModal, 'Debts', '#debt-id', () => ({
+        person_name: document.getElementById('debt-person').value,
+        amount: parseFloat(document.getElementById('debt-amount').value),
+        type: document.getElementById('debt-type').value,
+        status: document.getElementById('debt-status').value,
+        due_date: document.getElementById('debt-due-date').value || null,
+        description: document.getElementById('debt-description').value,
+        is_reminder_enabled: document.getElementById('debt-reminder-enabled').checked,
+        reminder_days: document.getElementById('debt-reminder-enabled').checked ? parseInt(document.getElementById('debt-reminder-days').value) : null
+    })));
+    
+    categoryForm.addEventListener('submit', (e) => handleFormSubmit(e, categoryModal, 'Categories', '#category-id', () => ({
+        name: document.getElementById('cat-name').value,
+        type: document.getElementById('cat-type').value
+    })));
+    
+    tagForm.addEventListener('submit', (e) => handleFormSubmit(e, tagModal, 'Tags', '#tag-id', () => ({
+        name: document.getElementById('tag-name').value
+    })));
+    
+    budgetForm.addEventListener('submit', (e) => handleFormSubmit(e, budgetModal, 'Budgets', '#budget-id', () => ({
+        category_id: parseInt(document.getElementById('budget-category').value),
+        amount: parseFloat(document.getElementById('budget-amount').value),
+        month: `${document.getElementById('budget-month').value}-01`
+    })));
+    
+    goalForm.addEventListener('submit', (e) => handleFormSubmit(e, goalModal, 'Savings_Goals', '#goal-id', () => ({
+        goal_name: document.getElementById('goal-name').value,
+        target_amount: parseFloat(document.getElementById('goal-target-amount').value),
+        current_amount: parseFloat(document.getElementById('goal-current-amount').value),
+        target_date: document.getElementById('goal-target-date').value || null
+    })));
+    
+    recurringForm.addEventListener('submit', (e) => handleFormSubmit(e, recurringModal, 'Recurring_Transactions', '#recurring-id', () => ({
+        description: document.getElementById('rec-description').value,
+        amount: parseFloat(document.getElementById('rec-amount').value),
+        type: document.getElementById('rec-type').value,
+        account_id: parseInt(document.getElementById('rec-account').value),
+        category_id: parseInt(document.getElementById('rec-category').value),
+        recurrence_rule: document.getElementById('rec-rule').value,
+        start_date: document.getElementById('rec-start-date').value,
+        next_due_date: document.getElementById('rec-start-date').value,
+        is_reminder_enabled: document.getElementById('rec-reminder-enabled').checked,
+        reminder_days: document.getElementById('rec-reminder-enabled').checked ? parseInt(document.getElementById('rec-reminder-days').value) : null
+    })));
+    
+    transferForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+        try {
+            const fromId = parseInt(document.getElementById('transfer-from').value);
+            const toId = parseInt(document.getElementById('transfer-to').value);
+            const amount = parseFloat(document.getElementById('transfer-amount').value);
+            if (fromId === toId) throw new Error("একই অ্যাকাউন্টে টাকা ট্রান্সফার করা যাবে না।");
+    
+            const { data: fromAcc } = await supabase.from('Accounts').select('balance').eq('id', fromId).single();
+            const { data: toAcc } = await supabase.from('Accounts').select('balance').eq('id', toId).single();
+    
+            await supabase.from('Accounts').update({ balance: fromAcc.balance - amount }).eq('id', fromId);
+            await supabase.from('Accounts').update({ balance: toAcc.balance + amount }).eq('id', toId);
+    
+            await supabase.from('Transfers').insert([{
+                from_account_id: fromId,
+                to_account_id: toId,
+                amount: amount,
+                transfer_date: document.getElementById('transfer-date').value,
+                description: document.getElementById('transfer-description').value,
+                user_id: currentUser.id
+            }]);
+    
+            showToast('টাকা সফলভাবে ট্রান্সফার হয়েছে।');
+            transferModal.close();
+            await loadAllDataAndRender();
+        } catch (error) {
+            console.error('Error transferring money:', error.message);
+            showToast(error.message, 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'ট্রান্সফার করুন';
+        }
+    });
+
+    // ডিলিট এবং এডিট বাটন
+    document.body.addEventListener('click', async (e) => {
+        const target = e.target.closest('.action-btn');
+        if (!target) return;
+    
+        const id = parseInt(target.dataset.id) || target.dataset.id;
+        const type = target.dataset.type;
+        
+        if (target.classList.contains('delete-btn')) {
+            const confirmed = await showConfirm('আপনি কি নিশ্চিতভাবে এটি মুছতে চান? এই কাজটি ফেরানো যাবে না।');
+            if (confirmed) {
+                let tableName;
+                switch(type) {
+                    case 'transaction': tableName = 'Transactions'; break;
+                    case 'category': tableName = 'Categories'; break;
+                    case 'budget': tableName = 'Budgets'; break;
+                    case 'goal': tableName = 'Savings_Goals'; break;
+                    case 'debt': tableName = 'Debts'; break;
+                    case 'account': tableName = 'Accounts'; break;
+                    case 'tag': tableName = 'Tags'; break;
+                    case 'recurring': tableName = 'Recurring_Transactions'; break;
+                    case 'asset': tableName = 'Assets'; break;
+                }
+                try {
+                    if (type === 'transaction') {
+                        const t = allTransactions.find(tr => tr.id == id);
+                        if(t) {
+                            const amountChange = t.type === 'expense' ? t.amount : -t.amount;
+                            const { data: account } = await supabase.from('Accounts').select('balance').eq('id', t.account_id).single();
+                            await supabase.from('Accounts').update({ balance: account.balance + amountChange }).eq('id', t.account_id);
+                            await supabase.from('Transaction_Tags').delete().eq('transaction_id', id);
+                        }
+                    }
+                    const { error } = await supabase.from(tableName).delete().eq('id', id);
+                    if (error) throw error;
+                    showToast('সফলভাবে মুছে ফেলা হয়েছে।');
+                    await loadAllDataAndRender();
+                } catch (error) {
+                    console.error(`Error deleting ${type}:`, error.message);
+                    showToast('মুছতে সমস্যা হয়েছে। সম্পর্কিত ডেটা থাকতে পারে।', 'error');
+                }
+            }
+        } else if (target.classList.contains('edit-btn')) {
+            openModal(type, id);
+        }
+    });
+    
+    // মডাল খোলার বাটন
+    addTransactionFab.addEventListener('click', () => openModal('transaction'));
+    addAccountBtn.addEventListener('click', () => openModal('account'));
+    addAssetBtn.addEventListener('click', () => openModal('asset'));
+    addTransferBtn.addEventListener('click', () => openModal('transfer'));
+    addDebtBtn.addEventListener('click', () => openModal('debt'));
+    addCategoryBtn.addEventListener('click', () => openModal('category'));
+    addTagBtn.addEventListener('click', () => openModal('tag'));
+    addBudgetBtn.addEventListener('click', () => openModal('budget'));
+    addGoalBtn.addEventListener('click', () => openModal('goal'));
+    addRecurringBtn.addEventListener('click', () => openModal('recurring'));
+
+    // মডাল বন্ধ করার বাটন
+    document.querySelectorAll('[data-close-modal]').forEach(btn => {
+        btn.addEventListener('click', () => btn.closest('dialog').close());
+    });
+    
+    // ক্যাটাগরি পরিবর্তনের ইভেন্ট
+    document.getElementById('tr-type').addEventListener('change', (e) => {
+        populateSelect(document.getElementById('tr-category'), allCategories.filter(c => c.type === e.target.value), 'id', 'name', 'ক্যাটাগরি নির্বাচন করুন');
+    });
+    document.getElementById('rec-type').addEventListener('change', (e) => {
+        populateSelect(document.getElementById('rec-category'), allCategories.filter(c => c.type === e.target.value), 'id', 'name', 'ক্যাটাগরি নির্বাচন করুন');
+    });
+
+    // রিমাইন্ডার ফিল্ড দেখানো/লুকানো
+    document.getElementById('debt-reminder-enabled').addEventListener('change', (e) => {
+        document.getElementById('debt-reminder-days').style.display = e.target.checked ? 'block' : 'none';
+    });
+    document.getElementById('rec-reminder-enabled').addEventListener('change', (e) => {
+        document.getElementById('rec-reminder-days').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    // সেটিংস এবং ডেটা ম্যানেজমেন্ট বাটন
+    loginHistoryBtn.addEventListener('click', openLoginHistoryModal);
+    deleteAccountBtn.addEventListener('click', handleDeleteAccount);
+    finalDeleteAccountBtn.addEventListener('click', handleDeleteAccount);
+
+    securityPinBtn.addEventListener('click', () => {
+        showToast('অ্যাপ পিন সেট করার ফিচারটি শীঘ্রই আসছে।', 'info');
+    });
+    
+    twoFactorBtn.addEventListener('click', () => {
+        showToast('2FA সেট করার ফিচারটি শীঘ্রই আসছে।', 'info');
+    });
+
+    backupDataBtn.addEventListener('click', async () => {
+        const confirmed = await showConfirm("আপনি কি সকল ডেটার ব্যাকআপ নিতে চান? এটি একটি JSON ফাইল ডাউনলোড করবে।");
+        if (!confirmed) return;
+    
+        showToast("ব্যাকআপ প্রস্তুত করা হচ্ছে...", "info");
+        const dataToBackup = {
+            Accounts: allAccounts,
+            Assets: allAssets,
+            Budgets: allBudgets,
+            Categories: allCategories,
+            Debts: allDebts,
+            Recurring_Transactions: allRecurring,
+            Savings_Goals: allGoals,
+            Tags: allTags,
+            Transactions: allTransactions.map(t => ({...t, Tags: undefined, Accounts: undefined, Categories: undefined})),
+            Transaction_Tags: allTransactionTags,
+            Transfers: allTransfers
+        };
+        
+        const jsonString = JSON.stringify(dataToBackup, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const date = new Date().toISOString().slice(0, 10);
+        link.download = `amar-hishab-backup-${date}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showToast("ব্যাকআপ সফলভাবে ডাউনলোড হয়েছে।");
+    });
+    
+    restoreDataBtn.addEventListener('click', () => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json';
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+    
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const backupData = JSON.parse(event.target.result);
+                    const confirmed = await showConfirm("আপনি কি নিশ্চিতভাবে ডেটা রিস্টোর করতে চান? এটি আপনার বর্তমান সকল ডেটা মুছে ফেলবে এবং ব্যাকআপ থেকে নতুন ডেটা যোগ করবে। এই কাজটি ফেরানো যাবে না।");
+                    if (!confirmed) return;
+    
+                    showToast("ডেটা রিস্টোর করা হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।", "info");
+    
+                    // Delete existing data
+                    await supabase.from('Transaction_Tags').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Transfers').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Transactions').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Recurring_Transactions').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Budgets').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Savings_Goals').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Debts').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Assets').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Accounts').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Categories').delete().eq('user_id', currentUser.id);
+                    await supabase.from('Tags').delete().eq('user_id', currentUser.id);
+    
+                    // Insert new data with current user's ID
+                    const stampWithUser = (data) => data.map(item => ({...item, user_id: currentUser.id, id: undefined}));
+                    
+                    await supabase.from('Tags').insert(stampWithUser(backupData.Tags || []));
+                    await supabase.from('Categories').insert(stampWithUser(backupData.Categories || []));
+                    await supabase.from('Accounts').insert(stampWithUser(backupData.Accounts || []));
+                    await supabase.from('Assets').insert(stampWithUser(backupData.Assets || []));
+                    await supabase.from('Debts').insert(stampWithUser(backupData.Debts || []));
+                    await supabase.from('Savings_Goals').insert(stampWithUser(backupData.Savings_Goals || []));
+                    await supabase.from('Budgets').insert(stampWithUser(backupData.Budgets || []));
+                    await supabase.from('Recurring_Transactions').insert(stampWithUser(backupData.Recurring_Transactions || []));
+                    await supabase.from('Transactions').insert(stampWithUser(backupData.Transactions || []));
+                    await supabase.from('Transfers').insert(stampWithUser(backupData.Transfers || []));
+                    
+                    showToast("ডেটা সফলভাবে রিস্টোর হয়েছে।", "success");
+                    await loadAllDataAndRender();
+    
+                } catch (error) {
+                    console.error("Restore error:", error);
+                    showToast("রিস্টোর করতে সমস্যা হয়েছে। ফাইলটি সঠিক ফরম্যাটে আছে কিনা দেখুন।", "error");
+                }
+            };
+            reader.readAsText(file);
+        };
+        fileInput.click();
+    });
+
+    exportBtn.addEventListener('click', () => {
+        if (allTransactions.length === 0) {
+            showToast("এক্সপোর্ট করার মতো কোনো ডেটা নেই।", "error");
+            return;
+        }
+        const dataToExport = allTransactions.map(t => ({
+            'তারিখ': formatDate(t.transaction_date),
+            'বিবরণ': t.description,
+            'ধরন': t.type === 'income' ? 'আয়' : 'ব্যয়',
+            'পরিমাণ': t.amount,
+            'ক্যাটাগরি': t.Categories?.name || '',
+            'অ্যাকাউন্ট': t.Accounts?.name || '',
+            'ট্যাগ': t.Tags.map(tag => tag.name).join(' | ')
+        }));
+        exportToCsv('transactions.csv', dataToExport);
+    });
+
+}); // DOMContentLoaded এর সমাপ্তি
