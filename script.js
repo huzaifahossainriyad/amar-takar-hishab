@@ -1475,6 +1475,9 @@ document.getElementById('rec-type').addEventListener('change', (e) => {
 document.getElementById('debt-reminder-enabled').addEventListener('change', (e) => {
     document.getElementById('debt-reminder-days').style.display = e.target.checked ? 'block' : 'none';
 });
+//...
 document.getElementById('rec-reminder-enabled').addEventListener('change', (e) => {
     document.getElementById('rec-reminder-days').style.display = e.target.checked ? 'block' : 'none';
 });
+
+}); // <-- এই লাইনটি যোগ করুন
