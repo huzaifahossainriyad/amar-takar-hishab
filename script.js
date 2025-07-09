@@ -86,9 +86,6 @@ const backupDataBtn = document.getElementById('backup-data-btn');
 const restoreDataBtn = document.getElementById('restore-data-btn');
 const finalDeleteAccountBtn = document.getElementById('final-delete-account-btn');
 
-// ...আগের কোড...
-const finalDeleteAccountBtn = document.getElementById('final-delete-account-btn');
-
 const securityPinBtn = document.getElementById('security-pin-btn'); // <<-- নতুন কোড
 const twoFactorBtn = document.getElementById('two-factor-btn');     // <<-- নতুন কোড
 
