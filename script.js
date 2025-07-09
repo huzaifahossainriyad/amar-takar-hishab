@@ -910,194 +910,13 @@ async function handleFormSubmit(e, modal, tableName, idField, dataExtractor) {
     }
 }
 
-// ==================================================
-// বিশেষ ফিচার (CSV, Backup, Reminder, Account Deletion)
-// ==================================================
-function exportToCsv(filename, rows) {
-    const processRow = row => Object.values(row).map(val => `"${(val || '').toString().replace(/"/g, '""')}"`).join(',');
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + [Object.keys(rows[0])].concat(rows.map(row => Object.values(row))).map(processRow).join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function checkReminders() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const upcomingReminders = [];
-
-    allDebts.forEach(debt => {
-        if (debt.is_reminder_enabled && debt.status === 'unpaid' && debt.due_date) {
-            const dueDate = new Date(debt.due_date);
-            const diffTime = dueDate - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            if (diffDays >= 0 && diffDays <= debt.reminder_days) {
-                upcomingReminders.push(`'${debt.person_name}' এর দেনা পরিশোধের তারিখ ${diffDays} দিন পর।`);
-            }
-        }
-    });
-
-    allRecurring.forEach(rec => {
-        if (rec.is_reminder_enabled && rec.next_due_date) {
-            const nextDueDate = new Date(rec.next_due_date);
-            const diffTime = nextDueDate - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-             if (diffDays >= 0 && diffDays <= rec.reminder_days) {
-                upcomingReminders.push(`'${rec.description}' বিলের তারিখ ${diffDays} দিন পর।`);
-            }
-        }
-    });
-
-    if (upcomingReminders.length > 0) {
-        showToast(upcomingReminders.join('\n'), 'info');
-    }
-}
-
-async function openLoginHistoryModal() {
-    loginHistoryTableBody.innerHTML = `<tr><td colspan="3" class="placeholder-cell"><i class="fa-solid fa-spinner fa-spin"></i> লোড হচ্ছে...</td></tr>`;
-    loginHistoryModal.showModal();
-    try {
-        const { data, error } = await supabase
-            .from('login_activity')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('login_time', { ascending: false })
-            .limit(20);
-
-        if (error) throw error;
-
-        if (data.length === 0) {
-            loginHistoryTableBody.innerHTML = `<tr><td colspan="3" class="placeholder-cell">কোনো লগইন হিস্টোরি পাওয়া যায়নি।</td></tr>`;
-            return;
-        }
-
-        loginHistoryTableBody.innerHTML = '';
-        data.forEach(activity => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${formatDate(activity.login_time)}</td>
-                <td>${activity.ip_address}</td>
-                <td>${activity.user_agent}</td>
-            `;
-            loginHistoryTableBody.appendChild(row);
-        });
-    } catch (error) {
-        console.error('Error fetching login history:', error.message);
-        loginHistoryTableBody.innerHTML = `<tr><td colspan="3" class="placeholder-cell">হিস্টোরি লোড করা যায়নি।</td></tr>`;
-        showToast('লগইন হিস্টোরি আনতে সমস্যা হয়েছে।', 'error');
-    }
-}
-
-async function handleDeleteAccount() {
-    const confirmed = await showConfirm("আপনি কি নিশ্চিতভাবে আপনার অ্যাকাউন্ট মুছে ফেলতে চান? এই কাজটি ফেরানো যাবে না। আপনার সকল ডেটা স্থায়ীভাবে মুছে যাবে।");
-    if (confirmed) {
-        try {
-            const { error } = await supabase.rpc('delete_current_user');
-            if (error) throw error;
-            
-            showToast("আপনার অ্যাকাউন্ট সফলভাবে মুছে ফেলা হয়েছে।", "success");
-            await supabase.auth.signOut();
-            window.location.href = 'login.html';
-
-        } catch (error) {
-            console.error('Error deleting account:', error.message);
-            showToast('অ্যাকাউন্ট মুছতে সমস্যা হয়েছে।', 'error');
-        }
-    }
-}
-
-// ==================================================
-// ইভেন্ট লিসেনার (Event Listeners)
-// ==================================================
-document.addEventListener('DOMContentLoaded', async () => {
-    // থিম সেট করা
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    htmlEl.setAttribute('data-theme', savedTheme);
-    themeToggle.checked = savedTheme === 'light';
-    
-    // সেশন চেক এবং ডেটা লোড
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (error || !session) {
-        window.location.href = 'login.html';
-        return;
-    }
-    
-    currentUser = session.user;
-    userEmailDisplay.textContent = currentUser.email;
-    
-    // নতুন: পিন চেক
-    const savedPin = localStorage.getItem('appPin');
-    if (savedPin) {
-        pinEntryScreen.style.display = 'flex';
-        headerContent.style.display = 'none';
-        mainContent.style.display = 'none';
-        addTransactionFab.style.display = 'none';
-    } else {
-        loadAllDataAndRender();
-    }
-
-
-    // ==================================================
-    // সকল ইভেন্ট লিসেনার এখানে যুক্ত করা হলো
-    // ==================================================
-
-    // থিম পরিবর্তন
-    themeToggle.addEventListener('change', () => {
-        const newTheme = themeToggle.checked ? 'light' : 'dark';
-        htmlEl.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-    });
-
-    // ট্যাব পরিবর্তন
-    tabs.addEventListener('click', (e) => {
-        const target = e.target.closest('.tab-link');
-        if (!target) return;
-
-        document.querySelectorAll('.tab-link').forEach(tab => tab.classList.remove('active'));
-        target.classList.add('active');
-
-        tabContents.forEach(content => content.classList.remove('active'));
-        document.getElementById(target.dataset.tab).classList.add('active');
-    });
-
-    // প্রোফাইল ড্রপডাউন
-    profileBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        profileDropdownContainer.classList.toggle('active');
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!profileDropdownContainer.contains(e.target)) {
-            profileDropdownContainer.classList.remove('active');
-        }
-    });
-    
-    logoutBtn.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        window.location.href = 'login.html';
-    });
-    
-    // ফিল্টার ইভেন্ট
-    [searchInput, typeFilter, startDateFilter, endDateFilter].forEach(el => {
-        el.addEventListener('input', renderTransactions);
-        el.addEventListener('change', renderTransactions);
-    });
-
-    // সকল ফর্ম সাবমিশন
-    transactionForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const id = document.getElementById('transaction-id').value;
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+// লেনদেন ফর্ম
+transactionForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('transaction-id').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
 
         try {
             const receiptFile = document.getElementById('tr-receipt').files[0];
@@ -1281,255 +1100,272 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // ডিলিট এবং এডিট বাটন
-    document.body.addEventListener('click', async (e) => {
-        const target = e.target.closest('.action-btn');
-        if (!target) return;
-    
-        const id = parseInt(target.dataset.id) || target.dataset.id;
-        const type = target.dataset.type;
-        
-        if (target.classList.contains('delete-btn')) {
-            const confirmed = await showConfirm('আপনি কি নিশ্চিতভাবে এটি মুছতে চান? এই কাজটি ফেরানো যাবে না।');
-            if (confirmed) {
-                let tableName;
-                switch(type) {
-                    case 'transaction': tableName = 'Transactions'; break;
-                    case 'category': tableName = 'Categories'; break;
-                    case 'budget': tableName = 'Budgets'; break;
-                    case 'goal': tableName = 'Savings_Goals'; break;
-                    case 'debt': tableName = 'Debts'; break;
-                    case 'account': tableName = 'Accounts'; break;
-                    case 'tag': tableName = 'Tags'; break;
-                    case 'recurring': tableName = 'Recurring_Transactions'; break;
-                    case 'asset': tableName = 'Assets'; break;
-                }
-                try {
-                    if (type === 'transaction') {
-                        const t = allTransactions.find(tr => tr.id == id);
-                        if(t) {
-                            const amountChange = t.type === 'expense' ? t.amount : -t.amount;
-                            const { data: account } = await supabase.from('Accounts').select('balance').eq('id', t.account_id).single();
-                            await supabase.from('Accounts').update({ balance: account.balance + amountChange }).eq('id', t.account_id);
-                            await supabase.from('Transaction_Tags').delete().eq('transaction_id', id);
-                        }
-                    }
-                    const { error } = await supabase.from(tableName).delete().eq('id', id);
-                    if (error) throw error;
-                    showToast('সফলভাবে মুছে ফেলা হয়েছে।');
-                    await loadAllDataAndRender();
-                } catch (error) {
-                    console.error(`Error deleting ${type}:`, error.message);
-                    showToast('মুছতে সমস্যা হয়েছে। সম্পর্কিত ডেটা থাকতে পারে।', 'error');
+// ==================================================
+// ডিলিট এবং এডিট হ্যান্ডলার
+// ==================================================
+document.body.addEventListener('click', async (e) => {
+    const target = e.target.closest('.action-btn.delete-btn');
+    if (!target) return;
+
+    const id = parseInt(target.dataset.id) || target.dataset.id;
+    const type = target.dataset.type;
+    const confirmed = await showConfirm('আপনি কি নিশ্চিতভাবে এটি মুছতে চান? এই কাজটি ফেরানো যাবে না।');
+    if (confirmed) {
+        let tableName;
+        switch(type) {
+            case 'transaction': tableName = 'Transactions'; break;
+            case 'category': tableName = 'Categories'; break;
+            case 'budget': tableName = 'Budgets'; break;
+            case 'goal': tableName = 'Savings_Goals'; break;
+            case 'debt': tableName = 'Debts'; break;
+            case 'account': tableName = 'Accounts'; break;
+            case 'tag': tableName = 'Tags'; break;
+            case 'recurring': tableName = 'Recurring_Transactions'; break;
+            case 'asset': tableName = 'Assets'; break;
+        }
+        try {
+            if (type === 'transaction') {
+                const t = allTransactions.find(tr => tr.id == id);
+                if(t) {
+                    const amountChange = t.type === 'expense' ? t.amount : -t.amount;
+                    const { data: account } = await supabase.from('Accounts').select('balance').eq('id', t.account_id).single();
+                    await supabase.from('Accounts').update({ balance: account.balance + amountChange }).eq('id', t.account_id);
+                    await supabase.from('Transaction_Tags').delete().eq('transaction_id', id);
                 }
             }
-        } else if (target.classList.contains('edit-btn')) {
-            openModal(type, id);
+            const { error } = await supabase.from(tableName).delete().eq('id', id);
+            if (error) throw error;
+            showToast('সফলভাবে মুছে ফেলা হয়েছে।');
+            await loadAllDataAndRender();
+        } catch (error) {
+            console.error(`Error deleting ${type}:`, error.message);
+            showToast('মুছতে সমস্যা হয়েছে। সম্পর্কিত ডেটা থাকতে পারে।', 'error');
         }
-    });
-    
-    // মডাল খোলার বাটন
-    addTransactionFab.addEventListener('click', () => openModal('transaction'));
-    addAccountBtn.addEventListener('click', () => openModal('account'));
-    addAssetBtn.addEventListener('click', () => openModal('asset'));
-    addTransferBtn.addEventListener('click', () => openModal('transfer'));
-    addDebtBtn.addEventListener('click', () => openModal('debt'));
-    addCategoryBtn.addEventListener('click', () => openModal('category'));
-    addTagBtn.addEventListener('click', () => openModal('tag'));
-    addBudgetBtn.addEventListener('click', () => openModal('budget'));
-    addGoalBtn.addEventListener('click', () => openModal('goal'));
-    addRecurringBtn.addEventListener('click', () => openModal('recurring'));
+    }
+});
 
-    // মডাল বন্ধ করার বাটন
-    document.querySelectorAll('[data-close-modal]').forEach(btn => {
-        btn.addEventListener('click', () => btn.closest('dialog').close());
-    });
-    
-    // ক্যাটাগরি পরিবর্তনের ইভেন্ট
-    document.getElementById('tr-type').addEventListener('change', (e) => {
-        populateSelect(document.getElementById('tr-category'), allCategories.filter(c => c.type === e.target.value), 'id', 'name', 'ক্যাটাগরি নির্বাচন করুন');
-    });
-    document.getElementById('rec-type').addEventListener('change', (e) => {
-        populateSelect(document.getElementById('rec-category'), allCategories.filter(c => c.type === e.target.value), 'id', 'name', 'ক্যাটাগরি নির্বাচন করুন');
-    });
+document.body.addEventListener('click', (e) => {
+    const target = e.target.closest('.action-btn.edit-btn');
+    if (!target) return;
+    const id = parseInt(target.dataset.id) || target.dataset.id;
+    const type = target.dataset.type;
+    openModal(type, id);
+});
 
-    // রিমাইন্ডার ফিল্ড দেখানো/লুকানো
-    document.getElementById('debt-reminder-enabled').addEventListener('change', (e) => {
-        document.getElementById('debt-reminder-days').style.display = e.target.checked ? 'block' : 'none';
-    });
-    document.getElementById('rec-reminder-enabled').addEventListener('change', (e) => {
-        document.getElementById('rec-reminder-days').style.display = e.target.checked ? 'block' : 'none';
-    });
+// ==================================================
+// বিশেষ ফিচার (CSV, Backup, Reminder, Account Deletion)
+// ==================================================
+function exportToCsv(filename, rows) {
+    const processRow = row => Object.values(row).map(val => `"${(val || '').toString().replace(/"/g, '""')}"`).join(',');
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + [Object.keys(rows[0])].concat(rows.map(row => Object.values(row))).map(processRow).join('\n');
 
-    // সেটিংস এবং ডেটা ম্যানেজমেন্ট বাটন
-    loginHistoryBtn.addEventListener('click', openLoginHistoryModal);
-    deleteAccountBtn.addEventListener('click', handleDeleteAccount);
-    finalDeleteAccountBtn.addEventListener('click', handleDeleteAccount);
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 
-    // নিরাপত্তা বাটন
-    securityPinBtn.addEventListener('click', () => openModal('security-pin'));
-    
-    twoFactorBtn.addEventListener('click', () => {
-        showToast('2FA সেট করার ফিচারটি শীঘ্রই আসছে।', 'info');
-    });
+exportBtn.addEventListener('click', () => {
+    if (allTransactions.length === 0) {
+        showToast("এক্সপোর্ট করার মতো কোনো ডেটা নেই।", "error");
+        return;
+    }
+    const dataToExport = allTransactions.map(t => ({
+        'তারিখ': formatDate(t.transaction_date),
+        'বিবরণ': t.description,
+        'ধরন': t.type === 'income' ? 'আয়' : 'ব্যয়',
+        'পরিমাণ': t.amount,
+        'ক্যাটাগরি': t.Categories?.name || '',
+        'অ্যাকাউন্ট': t.Accounts?.name || '',
+        'ট্যাগ': t.Tags.map(tag => tag.name).join(' | ')
+    }));
+    exportToCsv('transactions.csv', dataToExport);
+});
 
-    // পিন এন্ট্রি ফর্ম হ্যান্ডলার
-    pinEntryForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const enteredPin = Array.from(pinInputs).map(input => input.value).join('');
-        const savedPin = localStorage.getItem('appPin');
-        if (enteredPin === savedPin) {
-            pinEntryScreen.style.display = 'none';
-            headerContent.style.display = 'flex';
-            mainContent.style.display = 'flex';
-            addTransactionFab.style.display = 'flex';
-            loadAllDataAndRender();
-        } else {
-            pinErrorMsg.textContent = 'ভুল পিন। আবার চেষ্টা করুন।';
-            pinInputs.forEach(input => input.value = '');
-            pinInputs[0].focus();
-        }
-    });
-    
-    pinInputs.forEach((input, index) => {
-        input.addEventListener('keyup', (e) => {
-            if (e.key >= 0 && e.key <= 9) {
-                if (index < pinInputs.length - 1) {
-                    pinInputs[index + 1].focus();
-                }
-            } else if (e.key === 'Backspace') {
-                 if (index > 0) {
-                    pinInputs[index - 1].focus();
-                }
+function checkReminders() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const upcomingReminders = [];
+
+    allDebts.forEach(debt => {
+        if (debt.is_reminder_enabled && debt.status === 'unpaid' && debt.due_date) {
+            const dueDate = new Date(debt.due_date);
+            const diffTime = dueDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0 && diffDays <= debt.reminder_days) {
+                upcomingReminders.push(`'${debt.person_name}' এর দেনা পরিশোধের তারিখ ${diffDays} দিন পর।`);
             }
+        }
+    });
+
+    allRecurring.forEach(rec => {
+        if (rec.is_reminder_enabled && rec.next_due_date) {
+            const nextDueDate = new Date(rec.next_due_date);
+            const diffTime = nextDueDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+             if (diffDays >= 0 && diffDays <= rec.reminder_days) {
+                upcomingReminders.push(`'${rec.description}' বিলের তারিখ ${diffDays} দিন পর।`);
+            }
+        }
+    });
+
+    if (upcomingReminders.length > 0) {
+        showToast(upcomingReminders.join('\n'), 'info');
+    }
+}
+
+async function openLoginHistoryModal() {
+    loginHistoryTableBody.innerHTML = `<tr><td colspan="3" class="placeholder-cell"><i class="fa-solid fa-spinner fa-spin"></i> লোড হচ্ছে...</td></tr>`;
+    loginHistoryModal.showModal();
+    try {
+        const { data, error } = await supabase
+            .from('login_activity')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('login_time', { ascending: false })
+            .limit(20);
+
+        if (error) throw error;
+
+        if (data.length === 0) {
+            loginHistoryTableBody.innerHTML = `<tr><td colspan="3" class="placeholder-cell">কোনো লগইন হিস্টোরি পাওয়া যায়নি।</td></tr>`;
+            return;
+        }
+
+        loginHistoryTableBody.innerHTML = '';
+        data.forEach(activity => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${formatDate(activity.login_time)}</td>
+                <td>${activity.ip_address}</td>
+                <td>${activity.user_agent}</td>
+            `;
+            loginHistoryTableBody.appendChild(row);
         });
-    });
+    } catch (error) {
+        console.error('Error fetching login history:', error.message);
+        loginHistoryTableBody.innerHTML = `<tr><td colspan="3" class="placeholder-cell">হিস্টোরি লোড করা যায়নি।</td></tr>`;
+        showToast('লগইন হিস্টোরি আনতে সমস্যা হয়েছে।', 'error');
+    }
+}
 
-    // পিন সেট/পরিবর্তন ফর্ম হ্যান্ডলার
-    securityPinForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const currentPin = document.getElementById('current-pin').value;
-        const newPin = document.getElementById('new-pin').value;
-        const confirmPin = document.getElementById('confirm-pin').value;
-        const savedPin = localStorage.getItem('appPin');
+async function handleDeleteAccount() {
+    const confirmed = await showConfirm("আপনি কি নিশ্চিতভাবে আপনার অ্যাকাউন্ট মুছে ফেলতে চান? এই কাজটি ফেরানো যাবে না। আপনার সকল ডেটা স্থায়ীভাবে মুছে যাবে।");
+    if (confirmed) {
+        try {
+            const { error } = await supabase.rpc('delete_current_user');
+            if (error) throw error;
+            
+            showToast("আপনার অ্যাকাউন্ট সফলভাবে মুছে ফেলা হয়েছে।", "success");
+            await supabase.auth.signOut();
+            window.location.href = 'login.html';
 
-        if (savedPin && currentPin !== savedPin) {
-            showToast('আপনার বর্তমান পিন সঠিক নয়।', 'error');
-            return;
+        } catch (error) {
+            console.error('Error deleting account:', error.message);
+            showToast('অ্যাকাউন্ট মুছতে সমস্যা হয়েছে।', 'error');
         }
-        if (newPin !== confirmPin) {
-            showToast('নতুন পিন এবং কনফার্ম পিন মিলছে না।', 'error');
-            return;
-        }
-        if (!/^\d{4}$/.test(newPin)) {
-            showToast('পিন অবশ্যই ৪-সংখ্যার হতে হবে।', 'error');
-            return;
-        }
+    }
+}
 
-        localStorage.setItem('appPin', newPin);
-        showToast('অ্যাপ পিন সফলভাবে সেট করা হয়েছে।');
-        securityPinModal.close();
-    });
+// ==================================================
+// সেটিংস এবং ডেটা ম্যানেজমেন্ট
+// ==================================================
+backupDataBtn.addEventListener('click', async () => {
+    const confirmed = await showConfirm("আপনি কি সকল ডেটার ব্যাকআপ নিতে চান? এটি একটি JSON ফাইল ডাউনলোড করবে।");
+    if (!confirmed) return;
 
-    removePinBtn.addEventListener('click', async () => {
-        const confirmed = await showConfirm('আপনি কি নিশ্চিতভাবে অ্যাপ পিন মুছে ফেলতে চান?');
-        if (confirmed) {
-            localStorage.removeItem('appPin');
-            showToast('অ্যাপ পিন সফলভাবে মুছে ফেলা হয়েছে।');
-            securityPinModal.close();
-        }
-    });
-
-
-    backupDataBtn.addEventListener('click', async () => {
-        const confirmed = await showConfirm("আপনি কি সকল ডেটার ব্যাকআপ নিতে চান? এটি একটি JSON ফাইল ডাউনলোড করবে।");
-        if (!confirmed) return;
+    showToast("ব্যাকআপ প্রস্তুত করা হচ্ছে...", "info");
+    const dataToBackup = {
+        Accounts: allAccounts,
+        Assets: allAssets,
+        Budgets: allBudgets,
+        Categories: allCategories,
+        Debts: allDebts,
+        Recurring_Transactions: allRecurring,
+        Savings_Goals: allGoals,
+        Tags: allTags,
+        Transactions: allTransactions.map(t => ({...t, Tags: undefined, Accounts: undefined, Categories: undefined})),
+        Transaction_Tags: allTransactionTags,
+        Transfers: allTransfers
+    };
     
-        showToast("ব্যাকআপ প্রস্তুত করা হচ্ছে...", "info");
-        const dataToBackup = {
-            Accounts: allAccounts,
-            Assets: allAssets,
-            Budgets: allBudgets,
-            Categories: allCategories,
-            Debts: allDebts,
-            Recurring_Transactions: allRecurring,
-            Savings_Goals: allGoals,
-            Tags: allTags,
-            Transactions: allTransactions.map(t => ({...t, Tags: undefined, Accounts: undefined, Categories: undefined})),
-            Transaction_Tags: allTransactionTags,
-            Transfers: allTransfers
+    const jsonString = JSON.stringify(dataToBackup, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const date = new Date().toISOString().slice(0, 10);
+    link.download = `amar-hishab-backup-${date}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("ব্যাকআপ সফলভাবে ডাউনলোড হয়েছে।");
+});
+
+restoreDataBtn.addEventListener('click', () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const backupData = JSON.parse(event.target.result);
+                const confirmed = await showConfirm("আপনি কি নিশ্চিতভাবে ডেটা রিস্টোর করতে চান? এটি আপনার বর্তমান সকল ডেটা মুছে ফেলবে এবং ব্যাকআপ থেকে নতুন ডেটা যোগ করবে। এই কাজটি ফেরানো যাবে না।");
+                if (!confirmed) return;
+
+                showToast("ডেটা রিস্টোর করা হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।", "info");
+
+                // Delete existing data
+                await supabase.from('Transaction_Tags').delete().eq('user_id', currentUser.id);
+                await supabase.from('Transfers').delete().eq('user_id', currentUser.id);
+                await supabase.from('Transactions').delete().eq('user_id', currentUser.id);
+                await supabase.from('Recurring_Transactions').delete().eq('user_id', currentUser.id);
+                await supabase.from('Budgets').delete().eq('user_id', currentUser.id);
+                await supabase.from('Savings_Goals').delete().eq('user_id', currentUser.id);
+                await supabase.from('Debts').delete().eq('user_id', currentUser.id);
+                await supabase.from('Assets').delete().eq('user_id', currentUser.id);
+                await supabase.from('Accounts').delete().eq('user_id', currentUser.id);
+                await supabase.from('Categories').delete().eq('user_id', currentUser.id);
+                await supabase.from('Tags').delete().eq('user_id', currentUser.id);
+
+                // Insert new data with current user's ID
+                const stampWithUser = (data) => data.map(item => ({...item, user_id: currentUser.id, id: undefined}));
+                
+                await supabase.from('Tags').insert(stampWithUser(backupData.Tags || []));
+                await supabase.from('Categories').insert(stampWithUser(backupData.Categories || []));
+                await supabase.from('Accounts').insert(stampWithUser(backupData.Accounts || []));
+                await supabase.from('Assets').insert(stampWithUser(backupData.Assets || []));
+                await supabase.from('Debts').insert(stampWithUser(backupData.Debts || []));
+                await supabase.from('Savings_Goals').insert(stampWithUser(backupData.Savings_Goals || []));
+                await supabase.from('Budgets').insert(stampWithUser(backupData.Budgets || []));
+                await supabase.from('Recurring_Transactions').insert(stampWithUser(backupData.Recurring_Transactions || []));
+                await supabase.from('Transactions').insert(stampWithUser(backupData.Transactions || []));
+                await supabase.from('Transfers').insert(stampWithUser(backupData.Transfers || []));
+                // Transaction_Tags need special handling if IDs change. A more robust restore would map old IDs to new IDs.
+                // For now, this simple restore might fail on foreign keys.
+
+                showToast("ডেটা সফলভাবে রিস্টোর হয়েছে।", "success");
+                await loadAllDataAndRender();
+
+            } catch (error) {
+                console.error("Restore error:", error);
+                showToast("রিস্টোর করতে সমস্যা হয়েছে। ফাইলটি সঠিক ফরম্যাটে আছে কিনা দেখুন।", "error");
+            }
         };
-        
-        const jsonString = JSON.stringify(dataToBackup, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const date = new Date().toISOString().slice(0, 10);
-        link.download = `amar-hishab-backup-${date}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        showToast("ব্যাকআপ সফলভাবে ডাউনলোড হয়েছে।");
-    });
-    
-    restoreDataBtn.addEventListener('click', () => {
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.json';
-        fileInput.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-    
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                try {
-                    const backupData = JSON.parse(event.target.result);
-                    const confirmed = await showConfirm("আপনি কি নিশ্চিতভাবে ডেটা রিস্টোর করতে চান? এটি আপনার বর্তমান সকল ডেটা মুছে ফেলবে এবং ব্যাকআপ থেকে নতুন ডেটা যোগ করবে। এই কাজটি ফেরানো যাবে না।");
-                    if (!confirmed) return;
-    
-                    showToast("ডেটা রিস্টোর করা হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।", "info");
-    
-                    // Delete existing data
-                    await supabase.from('Transaction_Tags').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Transfers').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Transactions').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Recurring_Transactions').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Budgets').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Savings_Goals').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Debts').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Assets').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Accounts').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Categories').delete().eq('user_id', currentUser.id);
-                    await supabase.from('Tags').delete().eq('user_id', currentUser.id);
-    
-                    // Insert new data with current user's ID
-                    const stampWithUser = (data) => data.map(item => ({...item, user_id: currentUser.id, id: undefined}));
-                    
-                    await supabase.from('Tags').insert(stampWithUser(backupData.Tags || []));
-                    await supabase.from('Categories').insert(stampWithUser(backupData.Categories || []));
-                    await supabase.from('Accounts').insert(stampWithUser(backupData.Accounts || []));
-                    await supabase.from('Assets').insert(stampWithUser(backupData.Assets || []));
-                    await supabase.from('Debts').insert(stampWithUser(backupData.Debts || []));
-                    await supabase.from('Savings_Goals').insert(stampWithUser(backupData.Savings_Goals || []));
-                    await supabase.from('Budgets').insert(stampWithUser(backupData.Budgets || []));
-                    await supabase.from('Recurring_Transactions').insert(stampWithUser(backupData.Recurring_Transactions || []));
-                    await supabase.from('Transactions').insert(stampWithUser(backupData.Transactions || []));
-                    await supabase.from('Transfers').insert(stampWithUser(backupData.Transfers || []));
-                    
-                    showToast("ডেটা সফলভাবে রিস্টোর হয়েছে।", "success");
-                    await loadAllDataAndRender();
-    
-                } catch (error) {
-                    console.error("Restore error:", error);
-                    showToast("রিস্টোর করতে সমস্যা হয়েছে। ফাইলটি সঠিক ফরম্যাটে আছে কিনা দেখুন।", "error");
-                }
-            };
-            reader.readAsText(file);
-        };
-        fileInput.click();
-    });
+        reader.readAsText(file);
+    };
+    fileInput.click();
+});
 
     exportBtn.addEventListener('click', () => {
         if (allTransactions.length === 0) {
