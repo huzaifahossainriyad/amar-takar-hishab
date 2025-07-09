@@ -86,6 +86,19 @@ const backupDataBtn = document.getElementById('backup-data-btn');
 const restoreDataBtn = document.getElementById('restore-data-btn');
 const finalDeleteAccountBtn = document.getElementById('final-delete-account-btn');
 
+// ...আগের কোড...
+const finalDeleteAccountBtn = document.getElementById('final-delete-account-btn');
+
+const securityPinBtn = document.getElementById('security-pin-btn'); // <<-- নতুন কোড
+const twoFactorBtn = document.getElementById('two-factor-btn');     // <<-- নতুন কোড
+
+//
+// সকল মডাল এবং ফর্ম
+//
+const transactionModal = document.getElementById('transaction-modal');
+const transactionForm = document.getElementById('transaction-form');
+// ... পরের কোড ...
+
 // সকল মডাল এবং ফর্ম
 const transactionModal = document.getElementById('transaction-modal');
 const transactionForm = document.getElementById('transaction-form');
@@ -1408,9 +1421,29 @@ logoutBtn.addEventListener('click', async () => {
     window.location.href = 'login.html';
 });
 
+// ...আগের কোড...
+
 loginHistoryBtn.addEventListener('click', openLoginHistoryModal);
 deleteAccountBtn.addEventListener('click', handleDeleteAccount);
 finalDeleteAccountBtn.addEventListener('click', handleDeleteAccount);
+
+// =========================================================
+// অনুগ্রহ করে শুধু নিচের অংশটুকু এখানে যোগ করুন
+// =========================================================
+securityPinBtn.addEventListener('click', () => {
+    showToast('অ্যাপ পিন সেট করার ফিচারটি শীঘ্রই আসছে।', 'info');
+});
+
+twoFactorBtn.addEventListener('click', () => {
+    showToast('2FA সেট করার ফিচারটি শীঘ্রই আসছে।', 'info');
+});
+// =========================================================
+
+
+// ফিল্টার ইভেন্ট (এই অংশটিও আগে থেকে আছে)
+[searchInput, typeFilter, startDateFilter, endDateFilter].forEach(el => {
+    el.addEventListener('input', renderTransactions);
+//... পরের কোড...
 
 
 // ফিল্টার ইভেন্ট
