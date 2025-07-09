@@ -19,6 +19,27 @@
 <body>
 
     <!-- ================================================== -->
+    <!-- নতুন: পিন এন্ট্রি স্ক্রিন -->
+    <!-- ================================================== -->
+    <div id="pin-entry-screen" class="pin-screen" style="display: none;">
+        <div class="pin-box">
+            <i class="fa-solid fa-shield-halved pin-icon"></i>
+            <h2>অ্যাপটি লক করা আছে</h2>
+            <p>চালু করতে আপনার ৪-সংখ্যার পিন দিন</p>
+            <form id="pin-entry-form">
+                <div class="pin-inputs">
+                    <input type="password" maxlength="1" pattern="[0-9]" required>
+                    <input type="password" maxlength="1" pattern="[0-9]" required>
+                    <input type="password" maxlength="1" pattern="[0-9]" required>
+                    <input type="password" maxlength="1" pattern="[0-9]" required>
+                </div>
+                <button type="submit" class="btn-primary">আনলক করুন</button>
+            </form>
+            <p id="pin-error-msg" class="pin-error"></p>
+        </div>
+    </div>
+
+    <!-- ================================================== -->
     <!-- অ্যাপ্লিকেশনের প্রধান হেডার -->
     <!-- ================================================== -->
     <header>
@@ -75,7 +96,6 @@
 
         <!-- ড্যাশবোর্ড ট্যাব -->
         <div id="dashboard" class="tab-content active">
-            <!-- আগের মতোই থাকবে -->
             <section id="summary">
                 <article class="summary-card income">
                     <div class="card-icon"><i class="fa-solid fa-arrow-down"></i></div>
@@ -150,7 +170,7 @@
             </section>
         </div>
         
-        <!-- অন্যান্য ট্যাব (অপরিবর্তিত) -->
+        <!-- অন্যান্য ট্যাব -->
         <div id="accounts" class="tab-content">
             <section class="management-section">
                 <div class="section-header">
@@ -321,7 +341,7 @@
             </section>
         </div>
 
-        <!-- সেটিংস ট্যাব (আপডেটেড) -->
+        <!-- সেটিংস ট্যাব -->
         <div id="settings" class="tab-content">
             <section class="management-section">
                 <h2>অ্যাপ সেটিংস</h2>
@@ -349,7 +369,7 @@
                      <div class="setting-item">
                         <div>
                             <h3><i class="fa-solid fa-user-slash"></i> অ্যাকাউন্ট মুছে ফেলুন</h3>
-                            <p class="danger-text">সতর্কতা: এই কাজটি необратимый। আপনার সকল ডেটা স্থায়ীভাবে মুছে যাবে।</p>
+                            <p class="danger-text">সতর্কতা: এই কাজটি অপরিবর্তনীয়। আপনার সকল ডেটা স্থায়ীভাবে মুছে যাবে।</p>
                         </div>
                         <div class="header-buttons">
                             <button id="final-delete-account-btn" class="btn-danger"><i class="fa-solid fa-trash-can"></i> আমি অ্যাকাউন্ট মুছতে চাই</button>
@@ -366,8 +386,9 @@
         <i class="fa-solid fa-plus"></i>
     </button>
 
-    <!-- সকল মডাল (আগের মতোই, শুধু নতুন মডাল যোগ হবে) -->
-    <!-- লেনদেন মডাল (অপরিবর্তিত) -->
+    <!-- ================================================== -->
+    <!-- সকল মডাল -->
+    <!-- ================================================== -->
     <dialog id="transaction-modal">
         <h2 id="transaction-modal-title">নতুন হিসাব যোগ করুন</h2>
         <form id="transaction-form">
@@ -395,7 +416,6 @@
         </form>
     </dialog>
 
-    <!-- অন্যান্য মডাল (অপরিবর্তিত) -->
     <dialog id="account-modal">
         <h2 id="account-modal-title">নতুন অ্যাকাউন্ট</h2>
         <form id="account-form">
@@ -582,7 +602,6 @@
         </form>
     </dialog>
 
-    <!-- নতুন: লগইন হিস্টোরি মডাল -->
     <dialog id="login-history-modal">
         <h2>লগইন হিস্টোরি</h2>
         <div class="table-container">
@@ -595,7 +614,6 @@
                     </tr>
                 </thead>
                 <tbody id="login-history-table-body">
-                    <!-- ডেটা এখানে যুক্ত হবে -->
                 </tbody>
             </table>
         </div>
@@ -604,7 +622,30 @@
         </div>
     </dialog>
 
-    <!-- কাস্টম কনফার্মেশন ডায়ালগ -->
+    <!-- নতুন: অ্যাপ পিন মডাল -->
+    <dialog id="security-pin-modal">
+        <h2 id="security-pin-modal-title">অ্যাপ পিন সেট/পরিবর্তন করুন</h2>
+        <form id="security-pin-form">
+            <div>
+                <label for="current-pin">বর্তমান পিন (যদি থাকে):</label>
+                <input type="password" id="current-pin" placeholder="বর্তমান পিন দিন" maxlength="4" pattern="\d{4}">
+            </div>
+            <div>
+                <label for="new-pin">নতুন ৪-সংখ্যার পিন:</label>
+                <input type="password" id="new-pin" placeholder="নতুন পিন দিন" maxlength="4" pattern="\d{4}" required>
+            </div>
+            <div>
+                <label for="confirm-pin">নতুন পিন নিশ্চিত করুন:</label>
+                <input type="password" id="confirm-pin" placeholder="আবার নতুন পিন দিন" maxlength="4" pattern="\d{4}" required>
+            </div>
+            <div class="form-buttons">
+                <button type="button" id="remove-pin-btn" class="btn-danger" style="margin-right: auto;">পিন মুছে ফেলুন</button>
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">সেভ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
     <dialog id="confirm-dialog">
         <div class="dialog-content">
             <p id="confirm-msg">আপনি কি নিশ্চিত?</p>
@@ -615,7 +656,6 @@
         </div>
     </dialog>
     
-    <!-- টোস্ট নোটিফিকেশনের জন্য কন্টেইনার -->
     <div id="toast-container"></div>
 
     <!-- জাভাস্ক্রিপ্ট ফাইল -->
