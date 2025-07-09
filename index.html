@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="bn" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>আমার টাকার হিসাব - Finance Tracker</title>
+    
+    <!-- Google Fonts: Kalpurush -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kalpurush:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ================================================== -->
+    <!-- অ্যাপ্লিকেশনের প্রধান হেডার -->
+    <!-- ================================================== -->
+    <header>
+        <div class="header-content">
+            <i class="fa-solid fa-wallet header-icon"></i>
+            <h1>আমার টাকার হিসাব</h1>
+        </div>
+        
+        <div class="header-right">
+            <div class="theme-switch-wrapper">
+                <label for="theme-toggle" class="theme-label">
+                    <i class="fa-solid fa-sun light-icon"></i>
+                    <i class="fa-solid fa-moon dark-icon"></i>
+                </label>
+                <div class="theme-switch">
+                    <input type="checkbox" id="theme-toggle">
+                    <span class="slider"></span>
+                </div>
+            </div>
+            <div class="profile-dropdown" id="profile-dropdown-container">
+                <button id="profile-btn" class="profile-btn">
+                    <i class="fa-solid fa-user-circle"></i>
+                    <span id="user-email-display"></span>
+                    <i class="fa-solid fa-caret-down"></i>
+                </button>
+                <div class="dropdown-content" id="profile-dropdown-content">
+                    <a href="#" id="login-history-btn"><i class="fa-solid fa-clock-rotate-left"></i> লগইন হিস্টোরি</a>
+                    <a href="#" id="delete-account-btn" class="danger-link"><i class="fa-solid fa-trash-can"></i> অ্যাকাউন্ট মুছুন</a>
+                    <hr>
+                    <a href="#" id="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> লগআউট</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================================================== -->
+    <!-- প্রধান কন্টেন্ট এলাকা -->
+    <!-- ================================================== -->
+    <main>
+        <!-- ট্যাব নেভিগেশন -->
+        <nav class="tabs">
+            <button class="tab-link active" data-tab="dashboard"><i class="fa-solid fa-table-columns"></i> ড্যাশবোর্ড</button>
+            <button class="tab-link" data-tab="transactions"><i class="fa-solid fa-receipt"></i> লেনদেন</button>
+            <button class="tab-link" data-tab="accounts"><i class="fa-solid fa-landmark"></i> অ্যাকাউন্ট</button>
+            <button class="tab-link" data-tab="assets"><i class="fa-solid fa-sack-dollar"></i> সম্পদ</button>
+            <button class="tab-link" data-tab="debts"><i class="fa-solid fa-hand-holding-dollar"></i> দেনা-পাওনা</button>
+            <button class="tab-link" data-tab="budgets"><i class="fa-solid fa-bullseye"></i> বাজেট</button>
+            <button class="tab-link" data-tab="goals"><i class="fa-solid fa-piggy-bank"></i> সঞ্চয়ের লক্ষ্য</button>
+            <button class="tab-link" data-tab="recurring"><i class="fa-solid fa-arrows-rotate"></i> রিকারিং</button>
+            <button class="tab-link" data-tab="categories"><i class="fa-solid fa-tags"></i> ক্যাটাগরি ও ট্যাগ</button>
+            <button class="tab-link" data-tab="reports"><i class="fa-solid fa-chart-pie"></i> রিপোর্ট</button>
+            <button class="tab-link" data-tab="settings"><i class="fa-solid fa-gear"></i> সেটিংস</button>
+        </nav>
+
+        <!-- ড্যাশবোর্ড ট্যাব -->
+        <div id="dashboard" class="tab-content active">
+            <!-- আগের মতোই থাকবে -->
+            <section id="summary">
+                <article class="summary-card income">
+                    <div class="card-icon"><i class="fa-solid fa-arrow-down"></i></div>
+                    <div class="card-details">
+                        <h3>এই মাসের আয়</h3>
+                        <p>৳ ০.০০</p>
+                    </div>
+                </article>
+                <article class="summary-card expense">
+                    <div class="card-icon"><i class="fa-solid fa-arrow-up"></i></div>
+                    <div class="card-details">
+                        <h3>এই মাসের ব্যয়</h3>
+                        <p>৳ ০.০০</p>
+                    </div>
+                </article>
+                <article class="summary-card balance">
+                    <div class="card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+                    <div class="card-details">
+                        <h3>মোট ব্যালেন্স</h3>
+                        <p>৳ ০.০০</p>
+                    </div>
+                </article>
+            </section>
+            <section id="charts">
+                <h2>মাসিক আয় বনাম ব্যয় (গত ৬ মাস)</h2>
+                <div class="chart-container">
+                    <canvas id="incomeExpenseChart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <!-- লেনদেন ট্যাব -->
+        <div id="transactions" class="tab-content">
+             <section class="management-section">
+                <div class="section-header">
+                    <h2>সকল লেনদেন</h2>
+                    <div class="header-buttons">
+                        <button id="importBtn" class="btn-secondary"><i class="fa-solid fa-upload"></i> CSV ইমপোর্ট</button>
+                        <button id="exportBtn" class="btn-secondary"><i class="fa-solid fa-download"></i> CSV এক্সপোর্ট</button>
+                    </div>
+                </div>
+                 <div class="filter-controls">
+                    <div class="search-wrapper">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="searchInput" placeholder="বিবরণ বা ট্যাগ দিয়ে খুঁজুন...">
+                    </div>
+                    <select id="typeFilter">
+                        <option value="all">সব ধরন</option>
+                        <option value="income">শুধু আয়</option>
+                        <option value="expense">শুধু ব্যয়</option>
+                    </select>
+                     <input type="date" id="startDateFilter" class="date-filter">
+                     <label>থেকে</label>
+                     <input type="date" id="endDateFilter" class="date-filter">
+                </div>
+                <div class="table-container">
+                     <table>
+                        <thead>
+                            <tr>
+                                <th>বিবরণ ও ট্যাগ</th>
+                                <th>অ্যাকাউন্ট</th>
+                                <th>ক্যাটাগরি</th>
+                                <th>ধরন</th>
+                                <th>টাকার পরিমাণ</th>
+                                <th>তারিখ</th>
+                                <th>পদক্ষেপ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+        
+        <!-- অন্যান্য ট্যাব (অপরিবর্তিত) -->
+        <div id="accounts" class="tab-content">
+            <section class="management-section">
+                <div class="section-header">
+                    <h2>অ্যাকাউন্ট ম্যানেজমেন্ট</h2>
+                    <div class="header-buttons">
+                        <button id="add-transfer-btn" class="btn-secondary"><i class="fa-solid fa-right-left"></i> টাকা ট্রান্সফার</button>
+                        <button id="add-account-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> নতুন অ্যাকাউন্ট</button>
+                    </div>
+                </div>
+                <div id="account-grid" class="card-grid"></div>
+            </section>
+            <section class="management-section">
+                <h2>অ্যাকাউন্ট ব্যালেন্সের তুলনা</h2>
+                <div class="chart-container">
+                    <canvas id="account-balance-chart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <div id="assets" class="tab-content">
+            <section class="management-section">
+                <div class="section-header">
+                    <h2>সম্পদ ম্যানেজমেন্ট</h2>
+                    <button id="add-asset-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> নতুন সম্পদ</button>
+                </div>
+                <div id="asset-grid" class="card-grid"></div>
+            </section>
+            <section class="management-section">
+                <h2>সম্পদের ধরণ</h2>
+                <div class="chart-container">
+                    <canvas id="asset-allocation-chart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <div id="debts" class="tab-content">
+             <section class="management-section">
+                <div class="section-header">
+                    <h2>দেনা-পাওনার হিসাব</h2>
+                    <button id="add-debt-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> নতুন হিসাব</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                       <thead>
+                           <tr>
+                               <th>ব্যক্তির নাম</th>
+                               <th>বিবরণ</th>
+                               <th>ধরন</th>
+                               <th>টাকার পরিমাণ</th>
+                               <th>শেষ তারিখ</th>
+                               <th>অবস্থা</th>
+                               <th>পদক্ষেপ</th>
+                           </tr>
+                       </thead>
+                       <tbody id="debts-table-body"></tbody>
+                   </table>
+                </div>
+            </section>
+            <section class="management-section">
+                <h2>পরিশোধিত বনাম অপরিশোধিত</h2>
+                <div class="chart-container">
+                    <canvas id="debt-status-chart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <div id="budgets" class="tab-content">
+            <section class="management-section">
+                <div class="section-header">
+                    <h2>মাসিক বাজেট পরিচালনা</h2>
+                    <button id="add-budget-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> নতুন বাজেট</button>
+                </div>
+                <div id="budget-list" class="card-grid"></div>
+            </section>
+             <section class="management-section">
+                <h2>বাজেট বনাম খরচ</h2>
+                <div class="chart-container">
+                    <canvas id="budget-vs-spent-chart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <div id="goals" class="tab-content">
+             <section class="management-section">
+                <div class="section-header">
+                    <h2>সঞ্চয়ের লক্ষ্য</h2>
+                    <button id="add-goal-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> নতুন লক্ষ্য</button>
+                </div>
+                <div id="goal-list" class="card-grid"></div>
+            </section>
+             <section class="management-section">
+                <h2>লক্ষ্য অর্জনের অগ্রগতি</h2>
+                <div class="chart-container">
+                    <canvas id="goal-progress-chart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <div id="recurring" class="tab-content">
+             <section class="management-section">
+                <div class="section-header">
+                    <h2>রিকারিং লেনদেন</h2>
+                    <button id="add-recurring-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> নতুন রিকারিং হিসাব</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                       <thead>
+                           <tr>
+                               <th>বিবরণ</th>
+                               <th>অ্যাকাউন্ট</th>
+                               <th>ক্যাটাগরি</th>
+                               <th>ধরন</th>
+                               <th>টাকার পরিমাণ</th>
+                               <th>পরবর্তী তারিখ</th>
+                               <th>পদক্ষেপ</th>
+                           </tr>
+                       </thead>
+                       <tbody id="recurring-table-body"></tbody>
+                   </table>
+               </div>
+            </section>
+        </div>
+
+        <div id="categories" class="tab-content">
+            <div class="two-column-layout">
+                <section class="management-section">
+                    <div class="section-header">
+                        <h2>ক্যাটাগরি পরিচালনা</h2>
+                        <button id="add-category-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> নতুন ক্যাটাগরি</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                           <thead>
+                               <tr>
+                                   <th>নাম</th>
+                                   <th>ধরন</th>
+                                   <th>পদক্ষেপ</th>
+                               </tr>
+                           </thead>
+                           <tbody id="categories-table-body"></tbody>
+                       </table>
+                   </div>
+                </section>
+                <section class="management-section">
+                    <div class="section-header">
+                        <h2>ট্যাগ পরিচালনা</h2>
+                        <button id="add-tag-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> নতুন ট্যাগ</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                           <thead>
+                               <tr>
+                                   <th>নাম</th>
+                                   <th>পদক্ষেপ</th>
+                               </tr>
+                           </thead>
+                           <tbody id="tags-table-body"></tbody>
+                       </table>
+                   </div>
+                </section>
+            </div>
+        </div>
+
+        <div id="reports" class="tab-content">
+            <section class="management-section">
+                <h2>রিপোর্ট ও বিশ্লেষণ</h2>
+                <p>এই ফিচারটি শীঘ্রই আসছে।</p>
+            </section>
+        </div>
+
+        <!-- সেটিংস ট্যাব (আপডেটেড) -->
+        <div id="settings" class="tab-content">
+            <section class="management-section">
+                <h2>অ্যাপ সেটিংস</h2>
+                <div class="settings-options">
+                    <div class="setting-item">
+                        <div>
+                            <h3><i class="fa-solid fa-database"></i> ডেটা ম্যানেজমেন্ট</h3>
+                            <p>আপনার সকল ডেটা ব্যাকআপ নিন বা JSON ফাইল থেকে রিস্টোর করুন।</p>
+                        </div>
+                        <div class="header-buttons">
+                            <button id="backup-data-btn" class="btn-secondary"><i class="fa-solid fa-cloud-arrow-down"></i> ব্যাকআপ</button>
+                            <button id="restore-data-btn" class="btn-secondary"><i class="fa-solid fa-cloud-arrow-up"></i> রিস্টোর</button>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div>
+                            <h3><i class="fa-solid fa-shield-halved"></i> নিরাপত্তা</h3>
+                            <p>আপনার অ্যাকাউন্টের নিরাপত্তা সংক্রান্ত অপশন।</p>
+                        </div>
+                        <div class="header-buttons">
+                            <button id="security-pin-btn" class="btn-secondary"><i class="fa-solid fa-key"></i> অ্যাপ পিন সেট করুন</button>
+                            <button id="two-factor-btn" class="btn-secondary"><i class="fa-solid fa-mobile-screen-button"></i> 2FA সেট করুন</button>
+                        </div>
+                    </div>
+                     <div class="setting-item">
+                        <div>
+                            <h3><i class="fa-solid fa-user-slash"></i> অ্যাকাউন্ট মুছে ফেলুন</h3>
+                            <p class="danger-text">সতর্কতা: এই কাজটি необратимый। আপনার সকল ডেটা স্থায়ীভাবে মুছে যাবে।</p>
+                        </div>
+                        <div class="header-buttons">
+                            <button id="final-delete-account-btn" class="btn-danger"><i class="fa-solid fa-trash-can"></i> আমি অ্যাকাউন্ট মুছতে চাই</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- ফ্লোটিং অ্যাকশন বাটন (FAB) -->
+    <button type="button" aria-label="নতুন হিসাব যোগ করুন" id="add-transaction-fab">
+        <i class="fa-solid fa-plus"></i>
+    </button>
+
+    <!-- সকল মডাল (আগের মতোই, শুধু নতুন মডাল যোগ হবে) -->
+    <!-- লেনদেন মডাল (অপরিবর্তিত) -->
+    <dialog id="transaction-modal">
+        <h2 id="transaction-modal-title">নতুন হিসাব যোগ করুন</h2>
+        <form id="transaction-form">
+            <input type="hidden" id="transaction-id">
+            <div><label for="tr-date">তারিখ:</label><input type="date" id="tr-date" required></div>
+            <div><label for="tr-description">বিবরণ:</label><input type="text" id="tr-description" placeholder="যেমন: বাসা ভাড়া" required></div>
+            <div><label for="tr-amount">টাকার পরিমাণ:</label><input type="number" id="tr-amount" placeholder="5000" required></div>
+            <div>
+                <label for="tr-type">ধরন:</label>
+                <select id="tr-type" required>
+                    <option value="expense">ব্যয়</option><option value="income">আয়</option>
+                </select>
+            </div>
+            <div><label for="tr-account">অ্যাকাউন্ট:</label><select id="tr-account" required></select></div>
+            <div id="category-wrapper"><label for="tr-category">ক্যাটাগরি:</label><select id="tr-category" required></select></div>
+            <div><label for="tr-tags">ট্যাগ (কমা দিয়ে আলাদা করুন):</label><input type="text" id="tr-tags" placeholder="যেমন: অফিস, ফ্যামিলি ট্রিপ"></div>
+            <div>
+                <label for="tr-receipt">রসিদ (ঐচ্ছিক):</label><input type="file" id="tr-receipt" accept="image/*,application/pdf">
+                <div id="receipt-preview"></div>
+            </div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">যোগ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- অন্যান্য মডাল (অপরিবর্তিত) -->
+    <dialog id="account-modal">
+        <h2 id="account-modal-title">নতুন অ্যাকাউন্ট</h2>
+        <form id="account-form">
+            <input type="hidden" id="account-id">
+            <div><label for="acc-name">অ্যাকাউন্টের নাম:</label><input type="text" id="acc-name" placeholder="যেমন: বিকাশ অ্যাকাউন্ট" required></div>
+            <div><label for="acc-type">অ্যাকাউন্টের ধরন:</label>
+                <select id="acc-type" required>
+                    <option value="cash">ক্যাশ</option>
+                    <option value="mobile_wallet">মোবাইল ওয়ালেট</option>
+                    <option value="bank">ব্যাংক</option>
+                </select>
+            </div>
+            <div><label for="acc-balance">প্রাথমিক ব্যালেন্স:</label><input type="number" id="acc-balance" placeholder="1000" required></div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">সেভ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="asset-modal">
+        <h2 id="asset-modal-title">নতুন সম্পদ</h2>
+        <form id="asset-form">
+            <input type="hidden" id="asset-id">
+            <div><label for="asset-name">সম্পদের নাম:</label><input type="text" id="asset-name" placeholder="যেমন: গ্রামীণফোন স্টক" required></div>
+            <div>
+                <label for="asset-type">সম্পদের ধরণ:</label>
+                <select id="asset-type" required>
+                    <option value="Stock">স্টক/শেয়ার</option>
+                    <option value="Mutual Fund">মিউচুয়াল ফান্ড</option>
+                    <option value="Gold">সোনা</option>
+                    <option value="Property">জমি/ফ্ল্যাট</option>
+                    <option value="Other">অন্যান্য</option>
+                </select>
+            </div>
+            <div><label for="asset-purchase-price">কেনার মূল্য:</label><input type="number" id="asset-purchase-price" placeholder="50000"></div>
+            <div><label for="asset-current-value">বর্তমান মূল্য:</label><input type="number" id="asset-current-value" placeholder="55000" required></div>
+            <div><label for="asset-purchase-date">কেনার তারিখ:</label><input type="date" id="asset-purchase-date"></div>
+            <div><label for="asset-notes">নোট (ঐচ্ছিক):</label><input type="text" id="asset-notes" placeholder="অতিরিক্ত তথ্য"></div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">সেভ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="transfer-modal">
+        <h2 id="transfer-modal-title">টাকা ট্রান্সফার</h2>
+        <form id="transfer-form">
+            <input type="hidden" id="transfer-id">
+            <div><label for="transfer-from">কোন অ্যাকাউন্ট থেকে:</label><select id="transfer-from" required></select></div>
+            <div><label for="transfer-to">কোন অ্যাকাউন্টে:</label><select id="transfer-to" required></select></div>
+            <div><label for="transfer-amount">টাকার পরিমাণ:</label><input type="number" id="transfer-amount" placeholder="500" required></div>
+            <div><label for="transfer-date">তারিখ:</label><input type="date" id="transfer-date" required></div>
+            <div><label for="transfer-description">বিবরণ (ঐচ্ছিক):</label><input type="text" id="transfer-description" placeholder="বন্ধুকে ধার দিলাম"></div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">ট্রান্সফার করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="debt-modal">
+        <h2 id="debt-modal-title">নতুন দেনা-পাওনার হিসাব</h2>
+        <form id="debt-form">
+            <input type="hidden" id="debt-id">
+            <div><label for="debt-person">ব্যক্তির নাম:</label><input type="text" id="debt-person" placeholder="যেমন: আব্দুল করিম" required></div>
+            <div><label for="debt-amount">টাকার পরিমাণ:</label><input type="number" id="debt-amount" placeholder="2000" required></div>
+            <div>
+                <label for="debt-type">হিসাবের ধরন:</label>
+                <select id="debt-type" required>
+                    <option value="debt">আমি ঋণী (Debt)</option>
+                    <option value="loan">আমি ধার দিয়েছি (Loan)</option>
+                </select>
+            </div>
+            <div>
+                <label for="debt-status">অবস্থা:</label>
+                <select id="debt-status" required>
+                    <option value="unpaid">অপরিশোধিত (Unpaid)</option>
+                    <option value="paid">পরিশোধিত (Paid)</option>
+                </select>
+            </div>
+            <div><label for="debt-due-date">শেষ তারিখ (ঐচ্ছিক):</label><input type="date" id="debt-due-date"></div>
+            <div><label for="debt-description">বিবরণ (ঐচ্ছিক):</label><input type="text" id="debt-description" placeholder="মোবাইল কেনার জন্য"></div>
+            <div class="reminder-section">
+                <label><input type="checkbox" id="debt-reminder-enabled"> রিমাইন্ডার চালু করুন</label>
+                <input type="number" id="debt-reminder-days" placeholder="কতদিন আগে?" min="1" style="display: none;">
+            </div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">সেভ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="category-modal">
+        <h2 id="category-modal-title">নতুন ক্যাটাগরি</h2>
+        <form id="category-form">
+            <input type="hidden" id="category-id">
+            <div><label for="cat-name">নাম:</label><input type="text" id="cat-name" placeholder="যেমন: খাবার" required></div>
+            <div>
+                <label for="cat-type">ধরন:</label>
+                <select id="cat-type" required><option value="expense">ব্যয়</option><option value="income">আয়</option></select>
+            </div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">যোগ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="tag-modal">
+        <h2 id="tag-modal-title">নতুন ট্যাগ</h2>
+        <form id="tag-form">
+            <input type="hidden" id="tag-id">
+            <div><label for="tag-name">নাম:</label><input type="text" id="tag-name" placeholder="যেমন: অফিস" required></div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">যোগ করুন</button>
+            </div>
+        </form>
+    </dialog>
+    
+    <dialog id="budget-modal">
+        <h2 id="budget-modal-title">নতুন বাজেট</h2>
+        <form id="budget-form">
+            <input type="hidden" id="budget-id">
+            <div><label for="budget-category">ক্যাটাগরি:</label><select id="budget-category" required></select></div>
+            <div><label for="budget-amount">টাকার পরিমাণ:</label><input type="number" id="budget-amount" placeholder="10000" required></div>
+            <div><label for="budget-month">মাস:</label><input type="month" id="budget-month" required></div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">সেভ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="goal-modal">
+        <h2 id="goal-modal-title">নতুন সঞ্চয়ের লক্ষ্য</h2>
+        <form id="goal-form">
+            <input type="hidden" id="goal-id">
+            <div><label for="goal-name">লক্ষ্যের নাম:</label><input type="text" id="goal-name" placeholder="যেমন: নতুন ফোন কিনবো" required></div>
+            <div><label for="goal-target-amount">লক্ষ্যমাত্রা (টাকা):</label><input type="number" id="goal-target-amount" placeholder="50000" required></div>
+            <div><label for="goal-current-amount">বর্তমানে জমা (টাকা):</label><input type="number" id="goal-current-amount" placeholder="0" required></div>
+            <div><label for="goal-target-date">শেষ তারিখ (ঐচ্ছিক):</label><input type="date" id="goal-target-date"></div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">সেভ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="recurring-modal">
+        <h2 id="recurring-modal-title">নতুন রিকারিং হিসাব</h2>
+        <form id="recurring-form">
+            <input type="hidden" id="recurring-id">
+            <div><label for="rec-description">বিবরণ:</label><input type="text" id="rec-description" placeholder="যেমন: ইন্টারনেট বিল" required></div>
+            <div><label for="rec-amount">টাকার পরিমাণ:</label><input type="number" id="rec-amount" placeholder="1000" required></div>
+            <div>
+                <label for="rec-type">ধরন:</label>
+                <select id="rec-type" required>
+                    <option value="expense">ব্যয়</option><option value="income">আয়</option>
+                </select>
+            </div>
+            <div><label for="rec-account">অ্যাকাউন্ট:</label><select id="rec-account" required></select></div>
+            <div><label for="rec-category">ক্যাটাগরি:</label><select id="rec-category" required></select></div>
+            <div>
+                <label for="rec-rule">পুনরাবৃত্তি:</label>
+                <select id="rec-rule" required>
+                    <option value="monthly">প্রতি মাসে</option>
+                    <option value="weekly">প্রতি সপ্তাহে</option>
+                    <option value="yearly">প্রতি বছর</option>
+                </select>
+            </div>
+            <div><label for="rec-start-date">শুরুর তারিখ:</label><input type="date" id="rec-start-date" required></div>
+            <div class="reminder-section">
+                <label><input type="checkbox" id="rec-reminder-enabled"> রিমাইন্ডার চালু করুন</label>
+                <input type="number" id="rec-reminder-days" placeholder="কতদিন আগে?" min="1" style="display: none;">
+            </div>
+            <div class="form-buttons">
+                <button type="button" class="btn-secondary" data-close-modal>বাতিল</button>
+                <button type="submit" class="btn-primary">সেভ করুন</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- নতুন: লগইন হিস্টোরি মডাল -->
+    <dialog id="login-history-modal">
+        <h2>লগইন হিস্টোরি</h2>
+        <div class="table-container">
+            <table id="login-history-table">
+                <thead>
+                    <tr>
+                        <th>সময়</th>
+                        <th>আইপি অ্যাড্রেস</th>
+                        <th>ডিভাইস/ব্রাউজার</th>
+                    </tr>
+                </thead>
+                <tbody id="login-history-table-body">
+                    <!-- ডেটা এখানে যুক্ত হবে -->
+                </tbody>
+            </table>
+        </div>
+        <div class="form-buttons">
+            <button type="button" class="btn-secondary" data-close-modal>বন্ধ করুন</button>
+        </div>
+    </dialog>
+
+    <!-- কাস্টম কনফার্মেশন ডায়ালগ -->
+    <dialog id="confirm-dialog">
+        <div class="dialog-content">
+            <p id="confirm-msg">আপনি কি নিশ্চিত?</p>
+            <div class="dialog-buttons">
+                <button id="confirm-cancel-btn" class="btn-secondary">না</button>
+                <button id="confirm-ok-btn" class="btn-danger">হ্যাঁ, নিশ্চিত</button>
+            </div>
+        </div>
+    </dialog>
+    
+    <!-- টোস্ট নোটিফিকেশনের জন্য কন্টেইনার -->
+    <div id="toast-container"></div>
+
+    <!-- জাভাস্ক্রিপ্ট ফাইল -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="script.js"></script>
+
+</body>
+</html>
